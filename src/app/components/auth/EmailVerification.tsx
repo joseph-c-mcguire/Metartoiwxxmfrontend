@@ -7,7 +7,7 @@ import { ThemeToggle } from '../ThemeToggle';
 
 interface EmailVerificationProps {
   email: string;
-  onVerified: () => void;
+  onVerified: (token?: string, adminStatus?: boolean) => void;
   onBackToLogin: () => void;
 }
 

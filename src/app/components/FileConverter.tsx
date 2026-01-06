@@ -4,7 +4,7 @@ import { Textarea } from './ui/textarea';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Upload, X, Download, Copy, FileText, Loader2, Database, Settings } from 'lucide-react';
+import { Upload, X, Download, Copy, FileText, Loader2, Database, Settings, ChevronDown, ChevronUp, Shield } from 'lucide-react';
 import JSZip from 'jszip';
 import { toast } from 'sonner';
 import { ThemeToggle } from './ThemeToggle';
@@ -31,6 +31,7 @@ interface FileConverterProps {
   onLogout: () => void;
   userEmail: string;
   accessToken?: string;
+  onSwitchToAdmin?: () => void;
 }
 
 type IWXXMVersion = "2.1" | "3.0" | "2023-1";
@@ -47,7 +48,7 @@ interface ConversionParams {
   logLevel: LogLevel;
 }
 
-export function FileConverter({ onLogout, userEmail, accessToken }: FileConverterProps) {
+export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmin }: FileConverterProps) {
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [convertedFiles, setConvertedFiles] = useState<ConvertedFile[]>([]);
   const [manualInput, setManualInput] = useState('');
@@ -55,9 +56,10 @@ export function FileConverter({ onLogout, userEmail, accessToken }: FileConverte
   const [isConverting, setIsConverting] = useState(false);
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [isPreferencesDialogOpen, setIsPreferencesDialogOpen] = useState(false);
+  const [isParamsExpanded, setIsParamsExpanded] = useState(false);
   const [conversionParams, setConversionParams] = useState<ConversionParams>({
-    bulletinId: 'SAAA00',
-    issuingCenter: 'KWBC',
+    bulletinId: '',
+    issuingCenter: '',
     iwxxmVersion: '3.0',
     strictValidation: true,
     includeNilReasons: true,
@@ -65,6 +67,39 @@ export function FileConverter({ onLogout, userEmail, accessToken }: FileConverte
     logLevel: 'INFO',
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Check admin access and switch to admin view
+  const handleAdminAccess = async () => {
+    if (!onSwitchToAdmin) return;
+
+    try {
+      // Verify admin status with backend
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-2e3cda33/admin/stats`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      if (response.ok) {
+        // User has admin access
+        onSwitchToAdmin();
+      } else if (response.status === 403) {
+        // User is authenticated but not an admin
+        toast.error('Sorry, you don\'t have permissions for that.', {
+          description: 'Admin access is required to view the dashboard.'
+        });
+      } else {
+        // Other error
+        toast.error('Unable to verify admin access');
+      }
+    } catch (error) {
+      console.error('Error checking admin access:', error);
+      toast.error('Failed to verify admin permissions');
+    }
+  };
 
   // Load user preferences on mount from localStorage
   useEffect(() => {
@@ -320,6 +355,24 @@ export function FileConverter({ onLogout, userEmail, accessToken }: FileConverte
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">METAR → IWXXM Converter</h1>
             <div className="flex items-center gap-3">
+              {onSwitchToAdmin && (
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-purple-600 dark:text-purple-400" aria-hidden="true" />
+                  <select
+                    value="converter"
+                    onChange={(e) => {
+                      if (e.target.value === 'admin') {
+                        handleAdminAccess();
+                      }
+                    }}
+                    className="px-3 py-1.5 text-sm font-medium bg-purple-600 text-white border-0 rounded-md hover:bg-purple-700 dark:bg-purple-700 dark:hover:bg-purple-800 focus:ring-2 focus:ring-purple-500 focus:outline-none cursor-pointer"
+                    aria-label="Switch view"
+                  >
+                    <option value="converter" className="bg-white text-gray-900 dark:bg-gray-800 dark:text-white">File Converter</option>
+                    <option value="admin" className="bg-white text-gray-900 dark:bg-gray-800 dark:text-white">Admin Dashboard</option>
+                  </select>
+                </div>
+              )}
               <Button
                 onClick={() => setIsPreferencesDialogOpen(true)}
                 variant="outline"
@@ -410,8 +463,23 @@ export function FileConverter({ onLogout, userEmail, accessToken }: FileConverte
 
         {/* Conversion Parameters */}
         <Card className="mb-6 p-6 bg-white dark:bg-gray-800 dark:border-gray-700">
-          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Conversion Parameters</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Conversion Parameters</h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsParamsExpanded(!isParamsExpanded)}
+              className="hover:bg-gray-100 dark:hover:bg-gray-700 focus:ring-2 focus:ring-gray-500"
+              aria-label={isParamsExpanded ? 'Collapse parameters' : 'Expand parameters'}
+            >
+              {isParamsExpanded ? (
+                <ChevronUp className="w-4 h-4 text-gray-600 dark:text-gray-400" aria-hidden="true" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-gray-600 dark:text-gray-400" aria-hidden="true" />
+              )}
+            </Button>
+          </div>
+          <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ${isParamsExpanded ? '' : 'hidden'}`}>
             {/* Bulletin ID */}
             <div>
               <Label htmlFor="param-bulletin-id" className="dark:text-white mb-2">Bulletin ID</Label>

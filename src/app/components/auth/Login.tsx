@@ -14,7 +14,7 @@ interface LoginFormData {
 }
 
 interface LoginProps {
-  onLogin: (email: string, needsVerification: boolean) => void;
+  onLogin: (email: string, needsVerification: boolean, token?: string, adminStatus?: boolean) => void;
   onSwitchToRegister: () => void;
 }
 
@@ -233,6 +233,16 @@ export function Login({ onLogin, onSwitchToRegister }: LoginProps) {
               >
                 Sign up
               </button>
+            </p>
+          </div>
+
+          {/* Admin Access Link */}
+          <div className="mt-3 text-center">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Administrator?{' '}
+              <span className="text-purple-600 dark:text-purple-400 font-medium">
+                Login above to access admin dashboard
+              </span>
             </p>
           </div>
         </Card>

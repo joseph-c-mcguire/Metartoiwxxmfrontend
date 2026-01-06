@@ -14,9 +14,11 @@ export interface UserProfile {
   email: string;
   username: string;
   approval_status: UserApprovalStatus;
+  is_admin: boolean;
   created_at: string;
   approved_at?: string;
   approved_by?: string;
+  last_login?: string;
 }
 
 // Create a new user with email verification
@@ -47,6 +49,7 @@ export async function registerUser(email: string, password: string, username: st
       email,
       username,
       approval_status: 'pending',
+      is_admin: false,
       created_at: new Date().toISOString(),
     };
 
@@ -121,20 +124,6 @@ export async function approveUser(userId: string, adminUserId: string) {
   }
 }
 
-// Get all pending users (admin function)
-export async function getPendingUsers() {
-  try {
-    const allProfiles = await kv.getByPrefix<UserProfile>('user_profile:');
-    const pendingUsers = allProfiles.filter(profile => profile.approval_status === 'pending');
-    
-    console.log(`Retrieved ${pendingUsers.length} pending users`);
-    return { data: pendingUsers };
-  } catch (error) {
-    console.error('Error getting pending users:', error);
-    return { error: error instanceof Error ? error.message : 'Unknown error getting pending users' };
-  }
-}
-
 // Resend verification email
 export async function resendVerificationEmail(email: string) {
   try {
@@ -155,5 +144,101 @@ export async function resendVerificationEmail(email: string) {
   } catch (error) {
     console.error('Error resending verification email:', error);
     return { error: error instanceof Error ? error.message : 'Unknown error resending verification email' };
+  }
+}
+
+// Reject a user (admin function)
+export async function rejectUser(userId: string, adminUserId: string) {
+  try {
+    const profile = await kv.get<UserProfile>(`user_profile:${userId}`);
+    
+    if (!profile) {
+      console.error(`Cannot reject user: Profile not found for user_id: ${userId}`);
+      return { error: 'User profile not found' };
+    }
+
+    const updatedProfile: UserProfile = {
+      ...profile,
+      approval_status: 'rejected',
+      approved_at: new Date().toISOString(),
+      approved_by: adminUserId,
+    };
+
+    await kv.set(`user_profile:${userId}`, updatedProfile);
+
+    console.log(`User rejected: ${profile.email} by admin: ${adminUserId}`);
+    return { data: updatedProfile };
+  } catch (error) {
+    console.error('Error rejecting user:', error);
+    return { error: error instanceof Error ? error.message : 'Unknown error during rejection' };
+  }
+}
+
+// Get all pending users (admin function)
+export async function getPendingUsers() {
+  try {
+    const allProfiles = await kv.getByPrefix<UserProfile>('user_profile:');
+    const pendingUsers = allProfiles.filter(profile => profile.approval_status === 'pending');
+    
+    console.log(`Retrieved ${pendingUsers.length} pending users`);
+    return { data: pendingUsers };
+  } catch (error) {
+    console.error('Error getting pending users:', error);
+    return { error: error instanceof Error ? error.message : 'Unknown error getting pending users' };
+  }
+}
+
+// Get all users (admin function)
+export async function getAllUsers() {
+  try {
+    const allProfiles = await kv.getByPrefix<UserProfile>('user_profile:');
+    
+    console.log(`Retrieved ${allProfiles.length} total users`);
+    return { data: allProfiles };
+  } catch (error) {
+    console.error('Error getting all users:', error);
+    return { error: error instanceof Error ? error.message : 'Unknown error getting all users' };
+  }
+}
+
+// Check if user is admin
+export async function isUserAdmin(userId: string): Promise<boolean> {
+  try {
+    const profile = await kv.get<UserProfile>(`user_profile:${userId}`);
+    return profile?.is_admin === true;
+  } catch (error) {
+    console.error('Error checking admin status:', error);
+    return false;
+  }
+}
+
+// Toggle admin status (super admin function)
+export async function toggleAdminStatus(userId: string, isAdmin: boolean, adminUserId: string) {
+  try {
+    // Check if the requesting user is an admin
+    const adminProfile = await kv.get<UserProfile>(`user_profile:${adminUserId}`);
+    if (!adminProfile?.is_admin) {
+      return { error: 'Only administrators can modify admin status' };
+    }
+
+    const profile = await kv.get<UserProfile>(`user_profile:${userId}`);
+    
+    if (!profile) {
+      console.error(`Cannot modify admin status: Profile not found for user_id: ${userId}`);
+      return { error: 'User profile not found' };
+    }
+
+    const updatedProfile: UserProfile = {
+      ...profile,
+      is_admin: isAdmin,
+    };
+
+    await kv.set(`user_profile:${userId}`, updatedProfile);
+
+    console.log(`Admin status ${isAdmin ? 'granted to' : 'revoked from'}: ${profile.email} by admin: ${adminUserId}`);
+    return { data: updatedProfile };
+  } catch (error) {
+    console.error('Error toggling admin status:', error);
+    return { error: error instanceof Error ? error.message : 'Unknown error toggling admin status' };
   }
 }
