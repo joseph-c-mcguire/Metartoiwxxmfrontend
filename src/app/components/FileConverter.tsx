@@ -148,30 +148,48 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
     }
   };
 
-  // Mock conversion function - converts METAR to IWXXM XML
-  const convertMetarToIwxxm = (metarContent: string): string => {
-    const lines = metarContent.trim().split('\n').filter(line => line.trim());
-    let iwxxmXml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
-    iwxxmXml += `<IWXXM xmlns="http://icao.int/iwxxm/3.0">\n`;
+  // Convert METAR to IWXXM using backend API
+  const convertMetarToIwxxm = async (metarContent: string): Promise<string> => {
+    const formData = new FormData();
+    formData.append('manual_text', metarContent);
     
-    lines.forEach((line, index) => {
-      const parts = line.trim().split(/\s+/);
-      iwxxmXml += `  <MeteorologicalAerodromeObservation>\n`;
-      iwxxmXml += `    <observationTime>${new Date().toISOString()}</observationTime>\n`;
-      iwxxmXml += `    <content>${line}</content>\n`;
-      
-      if (parts.length > 0) {
-        iwxxmXml += `    <station>${parts[0]}</station>\n`;
+    try {
+      const response = await fetch('/api/convert', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+
+      // Handle authentication failure
+      if (response.status === 401) {
+        toast.error('Session expired. Please log in again.');
+        await onLogout();
+        return '';
       }
-      if (parts.length > 1) {
-        iwxxmXml += `    <timestamp>${parts[1]} ${parts[2] || ''}</timestamp>\n`;
+
+      if (!response.ok) {
+        const error = await response.json();
+        const errorMsg = error.detail?.message || 'Conversion failed';
+        toast.error(errorMsg);
+        return '';
+      }
+
+      const data = await response.json();
+      if (data.results && data.results.length > 0) {
+        return data.results[0].content;
       }
       
-      iwxxmXml += `  </MeteorologicalAerodromeObservation>\n`;
-    });
-    
-    iwxxmXml += `</IWXXM>`;
-    return iwxxmXml;
+      if (data.errors && data.errors.length > 0) {
+        toast.error(data.errors[0]);
+      }
+      return '';
+    } catch (error) {
+      console.error('Conversion error:', error);
+      toast.error('Unable to connect to conversion service');
+      return '';
+    }
   };
 
   const handleFileSelect = async (files: FileList | null) => {
@@ -220,41 +238,47 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
     }
 
     setIsConverting(true);
-    
-    // Simulate conversion delay for better UX
-    await new Promise(resolve => setTimeout(resolve, 800));
 
     const newConvertedFiles: ConvertedFile[] = [];
 
     // Convert pending files
-    pendingFiles.forEach(file => {
-      const converted = convertMetarToIwxxm(file.content);
-      newConvertedFiles.push({
-        id: `converted-${file.id}`,
-        originalName: file.name,
-        originalContent: file.content,
-        convertedContent: converted,
-        timestamp: Date.now(),
-      });
-    });
+    for (const file of pendingFiles) {
+      const converted = await convertMetarToIwxxm(file.content);
+      if (converted) {
+        newConvertedFiles.push({
+          id: `converted-${file.id}`,
+          originalName: file.name,
+          originalContent: file.content,
+          convertedContent: converted,
+          timestamp: Date.now(),
+        });
+      }
+    }
 
     // Convert manual input if provided
     if (manualInput.trim()) {
-      const converted = convertMetarToIwxxm(manualInput);
-      newConvertedFiles.push({
-        id: `manual-${Date.now()}`,
-        originalName: 'manual_input.txt',
-        originalContent: manualInput,
-        convertedContent: converted,
-        timestamp: Date.now(),
-      });
+      const converted = await convertMetarToIwxxm(manualInput);
+      if (converted) {
+        newConvertedFiles.push({
+          id: `manual-${Date.now()}`,
+          originalName: 'manual_input.txt',
+          originalContent: manualInput,
+          convertedContent: converted,
+          timestamp: Date.now(),
+        });
+      }
     }
 
     setConvertedFiles(prev => [...newConvertedFiles, ...prev]);
     setPendingFiles([]);
     setManualInput('');
     setIsConverting(false);
-    toast.success(`Successfully converted ${newConvertedFiles.length} file(s)`);
+    
+    if (newConvertedFiles.length > 0) {
+      toast.success(`Successfully converted ${newConvertedFiles.length} file(s)`);
+    } else {
+      toast.error('No files were successfully converted');
+    }
   };
 
   const handleDownloadSingle = (file: ConvertedFile) => {

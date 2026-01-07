@@ -29,9 +29,16 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
-    # Handle client-side routing
+    # Handle client-side routing - serve index.html for all non-file requests
     location / {
+        # First check if the request is for an actual file/directory
         try_files \$uri \$uri/ /index.html;
+    }
+
+    # Explicitly handle /auth/callback path (Supabase email verification redirect)
+    # Serve index.html which will handle the hash-based routing
+    location /auth/callback {
+        rewrite ^ /index.html break;
     }
 
     # Proxy API requests to backend service
@@ -43,9 +50,10 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
-    # Proxy auth requests to auth service
-    location /auth/ {
-        proxy_pass http://auth:8000/;
+    # Proxy auth requests to auth service (but NOT /auth/callback which is for SPA)
+    # Note: When using regex, proxy_pass cannot have URI path - it must be just the upstream
+    location ~ ^/auth/(?!callback) {
+        proxy_pass http://auth:8000;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;

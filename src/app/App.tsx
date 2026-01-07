@@ -20,14 +20,17 @@ function App() {
 
   // Listen for auth state changes (including email confirmation callbacks)
   useEffect(() => {
-    // Check if this is an email confirmation callback
+    // Check if this is an email confirmation callback (can be from /auth/callback path or from hash at root)
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const accessToken = hashParams.get('access_token');
     const type = hashParams.get('type');
+    const isAuthCallbackPath = window.location.pathname.includes('/auth/callback');
 
-    if (accessToken && type === 'signup') {
-      // User clicked email confirmation link
-      console.log('Email confirmation detected, redirecting to callback handler');
+    console.log('Path:', window.location.pathname, 'Hash accessToken:', !!accessToken, 'Type:', type);
+
+    if ((accessToken && (type === 'signup' || type === 'recovery')) || isAuthCallbackPath) {
+      // User clicked email confirmation or recovery link, or was redirected to /auth/callback
+      console.log('Auth callback detected, showing callback view');
       setCurrentView('callback');
       return;
     }
@@ -48,10 +51,12 @@ function App() {
       if (event === 'SIGNED_IN' && session?.user) {
         // User just clicked the email confirmation link
         if (session.user.email_confirmed_at && currentView !== 'converter' && currentView !== 'admin') {
+          console.log('User signed in with confirmed email');
           setUserEmail(session.user.email || '');
           setAccessToken(session.access_token);
-          // Redirect to verification view so they can check approval status
-          setCurrentView('verify');
+          setIsAuthenticated(true);
+          // Redirect to converter (or verification if needed for approval)
+          setCurrentView('converter');
         }
       }
 
@@ -160,11 +165,7 @@ function App() {
       )}
 
       {currentView === 'callback' && (
-        <AuthCallback
-          onLogin={handleLogin}
-          onRegister={handleRegister}
-          onVerified={handleVerified}
-        />
+        <AuthCallback />
       )}
 
       <Toaster />

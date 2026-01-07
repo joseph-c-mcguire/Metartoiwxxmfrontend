@@ -65,6 +65,11 @@ export function DatabaseUploadDialog({
         }
       );
 
+      if (response.status === 401) {
+        toast.error('Session expired. Please log in again.');
+        return;
+      }
+
       const data = await response.json();
 
       if (!response.ok) {
