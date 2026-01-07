@@ -57,11 +57,61 @@ export function AuthCallback({ onRegister }: AuthCallbackProps) {
           return;
         }
 
-        // Success!
-        console.log('Email confirmed successfully:', session.user.email);
+        // Check approval status from database
+        const { data: profile, error: profileError } = await supabase
+          .from('user_profiles')
+          .select('approval_status')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profileError || !profile) {
+          console.error('Error fetching profile:', profileError);
+          setStatus('error');
+          setMessage('Error loading profile. Please contact support.');
+          toast.error('Error loading user profile');
+          // Sign out the user since we can't verify their approval status
+          await supabase.auth.signOut();
+          setTimeout(() => {
+            window.location.hash = '';
+            window.location.href = '/';
+          }, 2000);
+          return;
+        }
+
+        // Check if user is approved
+        if (profile.approval_status === 'pending') {
+          console.log('User email verified but account pending approval');
+          setStatus('success');
+          setMessage('Email verified! Your account is pending admin approval.');
+          toast.success('Email verified! Your account is pending admin approval.');
+          // Sign out the user - they need to wait for approval
+          await supabase.auth.signOut();
+          setTimeout(() => {
+            window.location.hash = '';
+            window.location.href = '/';
+          }, 2000);
+          return;
+        }
+
+        if (profile.approval_status === 'rejected') {
+          console.log('User account was rejected');
+          setStatus('error');
+          setMessage('Your account registration was not approved. Please contact support.');
+          toast.error('Account registration was not approved');
+          // Sign out the user
+          await supabase.auth.signOut();
+          setTimeout(() => {
+            window.location.hash = '';
+            window.location.href = '/';
+          }, 2000);
+          return;
+        }
+
+        // Success - email verified AND account approved!
+        console.log('Email confirmed and account approved:', session.user.email);
         setStatus('success');
         setMessage('Email confirmed! Redirecting...');
-        toast.success('Email verified successfully!');
+        toast.success('Email verified and account approved!');
 
         // Clear the hash from URL
         window.location.hash = '';

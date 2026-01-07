@@ -5,7 +5,7 @@ import { Register } from "./components/auth/Register";
 import { EmailVerification } from "./components/auth/EmailVerification";
 import { AuthCallback } from "./components/auth/AuthCallback";
 import { AdminDashboard } from "./components/admin/AdminDashboard";
-import { Toaster } from "./components/ui/sonner";
+import { Toaster, toast } from "./components/ui/sonner";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { supabase } from '/utils/supabase/client';
 
@@ -52,10 +52,39 @@ function App() {
         // User just clicked the email confirmation link
         if (session.user.email_confirmed_at && currentView !== 'converter' && currentView !== 'admin') {
           console.log('User signed in with confirmed email');
+          
+          // Check approval status before allowing access
+          const { data: profile, error: profileError } = await supabase
+            .from('user_profiles')
+            .select('approval_status, is_admin')
+            .eq('id', session.user.id)
+            .single();
+
+          if (profileError || !profile) {
+            console.error('Error fetching profile:', profileError);
+            toast.error('Error loading user profile. Please try logging in.');
+            await supabase.auth.signOut();
+            return;
+          }
+
+          // Only allow access if approved
+          if (profile.approval_status !== 'approved') {
+            console.log('User not approved, signing out');
+            if (profile.approval_status === 'pending') {
+              toast.info('Your account is pending admin approval.');
+            } else if (profile.approval_status === 'rejected') {
+              toast.error('Your account registration was not approved.');
+            }
+            await supabase.auth.signOut();
+            return;
+          }
+
+          // User is approved - allow access
           setUserEmail(session.user.email || '');
           setAccessToken(session.access_token);
           setIsAuthenticated(true);
-          // Redirect to converter (or verification if needed for approval)
+          setIsAdmin(profile.is_admin || false);
+          // Redirect to converter
           setCurrentView('converter');
         }
       }
