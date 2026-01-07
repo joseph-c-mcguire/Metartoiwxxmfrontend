@@ -1,0 +1,139 @@
+import { useEffect, useState } from 'react';
+import { supabase } from '/utils/supabase/client';
+import { toast } from 'sonner';
+import { Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { Card } from '../ui/card';
+
+interface AuthCallbackProps {
+  onRegister: (email: string) => void;
+}
+
+export function AuthCallback({ onRegister }: AuthCallbackProps) {
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [message, setMessage] = useState('Confirming your email...');
+
+  useEffect(() => {
+    const handleCallback = async () => {
+      try {
+        // Get the session from URL hash
+        const { data: { session }, error } = await supabase.auth.getSession();
+
+        if (error) {
+          console.error('Error getting session:', error);
+          setStatus('error');
+          setMessage('Failed to confirm email. Please try again.');
+          toast.error('Email confirmation failed');
+          setTimeout(() => {
+            window.location.hash = '';
+            onRegister('');
+          }, 2000);
+          return;
+        }
+
+        if (!session?.user) {
+          console.error('No session or user found');
+          setStatus('error');
+          setMessage('No confirmation data found. Please try again.');
+          toast.error('Email confirmation failed');
+          setTimeout(() => {
+            window.location.hash = '';
+            onRegister('');
+          }, 2000);
+          return;
+        }
+
+        // Check if email was confirmed
+        if (!session.user.email_confirmed_at) {
+          console.error('Email not confirmed');
+          setStatus('error');
+          setMessage('Email not confirmed. Please check your inbox.');
+          toast.error('Email not confirmed');
+          setTimeout(() => {
+            window.location.hash = '';
+            onRegister('');
+          }, 2000);
+          return;
+        }
+
+        // Success!
+        console.log('Email confirmed successfully:', session.user.email);
+        setStatus('success');
+        setMessage('Email confirmed! Checking approval status...');
+        toast.success('Email verified successfully!');
+
+        // Clear the hash from URL
+        window.location.hash = '';
+
+        // Redirect to verification screen after short delay
+        setTimeout(() => {
+          onRegister(session.user.email || '');
+        }, 1500);
+
+      } catch (error) {
+        console.error('Callback error:', error);
+        setStatus('error');
+        setMessage('An error occurred. Please try again.');
+        toast.error('Email confirmation failed');
+        setTimeout(() => {
+          window.location.hash = '';
+          onRegister('');
+        }, 2000);
+      }
+    };
+
+    handleCallback();
+  }, [onRegister]);
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center px-4 py-8 transition-colors">
+      <Card className="w-full max-w-md p-8 bg-white dark:bg-gray-800 dark:border-gray-700 shadow-lg">
+        <div className="text-center">
+          {status === 'loading' && (
+            <>
+              <Loader2 className="w-16 h-16 mx-auto mb-4 text-blue-600 dark:text-blue-400 animate-spin" />
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                Confirming Email
+              </h2>
+              <p className="text-gray-600 dark:text-gray-300">
+                {message}
+              </p>
+            </>
+          )}
+
+          {status === 'success' && (
+            <>
+              <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-600 dark:text-green-400" />
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                Email Confirmed!
+              </h2>
+              <p className="text-gray-600 dark:text-gray-300">
+                {message}
+              </p>
+            </>
+          )}
+
+          {status === 'error' && (
+            <>
+              <XCircle className="w-16 h-16 mx-auto mb-4 text-red-600 dark:text-red-400" />
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                Confirmation Failed
+              </h2>
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
+                {message}
+              </p>
+              <button
+                onClick={() => {
+                  window.location.hash = '';
+                  onRegister('');
+                }}
+                className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+              >
+                Return to Login
+              </button>
+            </>
+          )}
+        </div>
+      </Card>
+    </div>
+  );
+}

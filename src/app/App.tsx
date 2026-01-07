@@ -3,12 +3,13 @@ import { FileConverter } from "./components/FileConverter";
 import { Login } from "./components/auth/Login";
 import { Register } from "./components/auth/Register";
 import { EmailVerification } from "./components/auth/EmailVerification";
+import { AuthCallback } from "./components/auth/AuthCallback";
 import { AdminDashboard } from "./components/admin/AdminDashboard";
 import { Toaster } from "./components/ui/sonner";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { supabase } from '/utils/supabase/client';
 
-type AuthView = 'login' | 'register' | 'verify' | 'converter' | 'admin';
+type AuthView = 'login' | 'register' | 'verify' | 'converter' | 'admin' | 'callback';
 
 function App() {
   const [currentView, setCurrentView] = useState<AuthView>('login');
@@ -19,6 +20,18 @@ function App() {
 
   // Listen for auth state changes (including email confirmation callbacks)
   useEffect(() => {
+    // Check if this is an email confirmation callback
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const accessToken = hashParams.get('access_token');
+    const type = hashParams.get('type');
+
+    if (accessToken && type === 'signup') {
+      // User clicked email confirmation link
+      console.log('Email confirmation detected, redirecting to callback handler');
+      setCurrentView('callback');
+      return;
+    }
+
     // Check for existing session on mount
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
@@ -143,6 +156,14 @@ function App() {
           userEmail={userEmail}
           accessToken={accessToken}
           onSwitchToConverter={handleSwitchToConverter}
+        />
+      )}
+
+      {currentView === 'callback' && (
+        <AuthCallback
+          onLogin={handleLogin}
+          onRegister={handleRegister}
+          onVerified={handleVerified}
         />
       )}
 

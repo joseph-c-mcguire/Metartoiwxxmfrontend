@@ -28,15 +28,43 @@ export function Login({ onLogin, onSwitchToRegister }: LoginProps) {
     setIsLoading(true);
     
     try {
-      // Login directly with Supabase
+      let email = data.emailOrUsername;
+
+      // If user entered username instead of email, look up their email
+      if (!email.includes('@')) {
+        // It's a username, need to fetch the email from database
+        const { data: profileData, error: lookupError } = await supabase
+          .from('user_profiles')
+          .select('email')
+          .eq('username', email)
+          .single();
+
+        if (lookupError || !profileData) {
+          console.error('Username lookup error:', lookupError);
+          toast.error('Invalid username or password');
+          setIsLoading(false);
+          return;
+        }
+
+        email = profileData.email;
+      }
+
+      // Login directly with Supabase using email
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: data.emailOrUsername,
+        email: email,
         password: data.password,
       });
 
       if (authError) {
         console.error('Login error:', authError);
-        toast.error(authError.message || 'Invalid email or password');
+        // Better error messages
+        if (authError.message.includes('Invalid login credentials')) {
+          toast.error('Invalid email or password. Please check your credentials and try again.');
+        } else if (authError.message.includes('Email not confirmed')) {
+          toast.error('Please verify your email before logging in.');
+        } else {
+          toast.error(authError.message || 'Invalid email or password');
+        }
         setIsLoading(false);
         return;
       }
