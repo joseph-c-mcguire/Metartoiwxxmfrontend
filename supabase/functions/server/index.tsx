@@ -157,6 +157,64 @@ app.post("/make-server-2e3cda33/auth/resend-verification", async (c) => {
   }
 });
 
+// Get user profile (authenticated users)
+app.get("/make-server-2e3cda33/auth/profile", async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    
+    if (!accessToken) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const { data: { user }, error } = await supabase.auth.getUser(accessToken);
+    
+    if (error || !user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const result = await auth.getUserProfile(user.id);
+
+    if (result.error) {
+      return c.json({ error: result.error }, 400);
+    }
+
+    return c.json({ profile: result.data });
+  } catch (error) {
+    console.error('Get profile endpoint error:', error);
+    return c.json({ error: 'Internal server error getting profile' }, 500);
+  }
+});
+
+// Update user profile (authenticated users)
+app.put("/make-server-2e3cda33/auth/profile", async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    
+    if (!accessToken) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const { data: { user }, error } = await supabase.auth.getUser(accessToken);
+    
+    if (error || !user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const { username, email } = await c.req.json();
+
+    const result = await auth.updateUserProfile(user.id, { username, email });
+
+    if (result.error) {
+      return c.json({ error: result.error }, 400);
+    }
+
+    return c.json(result.data);
+  } catch (error) {
+    console.error('Update profile endpoint error:', error);
+    return c.json({ error: 'Internal server error updating profile' }, 500);
+  }
+});
+
 // Upload converted files to database
 app.post("/make-server-2e3cda33/database/upload", async (c) => {
   try {

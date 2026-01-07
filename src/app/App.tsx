@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FileConverter } from "./components/FileConverter";
 import { Login } from "./components/auth/Login";
 import { Register } from "./components/auth/Register";
@@ -6,6 +6,7 @@ import { EmailVerification } from "./components/auth/EmailVerification";
 import { AdminDashboard } from "./components/admin/AdminDashboard";
 import { Toaster } from "./components/ui/sonner";
 import { ThemeProvider } from "./components/ThemeProvider";
+import { supabase } from '/utils/supabase/client';
 
 type AuthView = 'login' | 'register' | 'verify' | 'converter' | 'admin';
 
@@ -15,6 +16,48 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [accessToken, setAccessToken] = useState<string>('');
   const [isAdmin, setIsAdmin] = useState(false);
+
+  // Listen for auth state changes (including email confirmation callbacks)
+  useEffect(() => {
+    // Check for existing session on mount
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        console.log('Existing session found:', session.user.email);
+        // Don't auto-login here, let the user go through the normal flow
+      }
+    });
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state change:', event, session?.user?.email);
+
+      // When email is confirmed via link, Supabase creates a session
+      if (event === 'SIGNED_IN' && session?.user) {
+        // User just clicked the email confirmation link
+        if (session.user.email_confirmed_at && currentView !== 'converter' && currentView !== 'admin') {
+          setUserEmail(session.user.email || '');
+          setAccessToken(session.access_token);
+          // Redirect to verification view so they can check approval status
+          setCurrentView('verify');
+        }
+      }
+
+      // Handle sign out
+      if (event === 'SIGNED_OUT') {
+        setIsAuthenticated(false);
+        setUserEmail('');
+        setAccessToken('');
+        setIsAdmin(false);
+        if (currentView !== 'login' && currentView !== 'register') {
+          setCurrentView('login');
+        }
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [currentView]);
 
   const handleLogin = (email: string, needsVerification: boolean, token?: string, adminStatus?: boolean) => {
     setUserEmail(email);
@@ -42,7 +85,10 @@ function App() {
     setCurrentView(adminStatus ? 'admin' : 'converter');
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Sign out from Supabase
+    await supabase.auth.signOut();
+    
     setIsAuthenticated(false);
     setUserEmail('');
     setAccessToken('');

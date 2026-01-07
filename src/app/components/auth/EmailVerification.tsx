@@ -4,6 +4,8 @@ import { Card } from '../ui/card';
 import { Mail, CheckCircle, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { ThemeToggle } from '../ThemeToggle';
+import { supabase } from '/utils/supabase/client';
+import { projectId, publicAnonKey } from '/utils/supabase/info';
 
 interface EmailVerificationProps {
   email: string;
@@ -11,50 +13,151 @@ interface EmailVerificationProps {
   onBackToLogin: () => void;
 }
 
-export function EmailVerification({ email, onVerified, onBackToLogin }: EmailVerificationProps) {
+export function EmailVerification({
+  email,
+  onVerified,
+  onBackToLogin,
+}: EmailVerificationProps) {
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [canResend, setCanResend] = useState(false);
   const [countdown, setCountdown] = useState(60);
+  const [emailStatus, setEmailStatus] = useState<'not_verified' | 'verified_pending' | 'verified_approved'>('not_verified');
+
+  // Check initial email verification status
+  useEffect(() => {
+    checkInitialStatus();
+  }, []);
+
+  const checkInitialStatus = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user?.email_confirmed_at) {
+        // Email is verified! Check approval status
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('approval_status')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profile?.approval_status === 'approved') {
+          setEmailStatus('verified_approved');
+        } else {
+          setEmailStatus('verified_pending');
+        }
+      } else {
+        setEmailStatus('not_verified');
+      }
+    } catch (error) {
+      console.error('Error checking initial status:', error);
+    }
+  };
 
   useEffect(() => {
-    // Start countdown
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          setCanResend(true);
-          clearInterval(timer);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [isResending]);
+    if (countdown > 0 && !canResend) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
+    } else if (countdown === 0) {
+      setCanResend(true);
+    }
+  }, [countdown, canResend]);
 
   const handleVerify = async () => {
     setIsVerifying(true);
     
-    // Simulate verification check
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    toast.success('Email verified successfully!');
-    onVerified();
-    
-    setIsVerifying(false);
+    try {
+      // Check current session to see if email is verified
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Error checking session:', sessionError);
+        toast.error('Unable to check verification status. Please try again.');
+        setIsVerifying(false);
+        return;
+      }
+
+      if (!session || !session.user) {
+        toast.info('Please click the verification link in your email first, then try again.');
+        setIsVerifying(false);
+        return;
+      }
+
+      if (!session.user.email_confirmed_at) {
+        toast.info('Email not verified yet. Please click the link in your email first.');
+        setIsVerifying(false);
+        return;
+      }
+
+      // Email is verified! Now check approval status from database
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('approval_status, is_admin, username')
+        .eq('id', session.user.id)
+        .single();
+
+      if (profileError) {
+        console.error('Error fetching profile:', profileError);
+        toast.error('Error loading user profile. Please try again.');
+        setIsVerifying(false);
+        return;
+      }
+
+      if (!profile) {
+        toast.error('User profile not found. Please contact support.');
+        setIsVerifying(false);
+        return;
+      }
+
+      if (profile.approval_status === 'approved') {
+        // Both verified and approved
+        toast.success('Email verified and account approved! Logging you in...');
+        onVerified(session.access_token, profile.is_admin);
+      } else if (profile.approval_status === 'pending') {
+        // Verified but not approved yet
+        toast.success('Email verified! Your account is pending admin approval.');
+        await supabase.auth.signOut();
+        onBackToLogin();
+      } else {
+        // Rejected
+        toast.error('Your account registration was not approved. Please contact support.');
+        await supabase.auth.signOut();
+        onBackToLogin();
+      }
+      
+    } catch (error) {
+      console.error('Verification check error:', error);
+      toast.error('An error occurred while checking verification status.');
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
   const handleResend = async () => {
     setIsResending(true);
     
-    // Simulate sending email
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    toast.success('Verification email sent!');
-    setCanResend(false);
-    setCountdown(60);
-    setIsResending(false);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+      });
+
+      if (error) {
+        console.error('Resend error:', error);
+        toast.error(error.message || 'Failed to resend verification email.');
+      } else {
+        toast.success('Verification email sent! Please check your inbox.');
+      }
+
+      setCanResend(false);
+      setCountdown(60);
+      
+    } catch (error) {
+      console.error('Resend verification error:', error);
+      toast.error('An error occurred while resending the email.');
+    } finally {
+      setIsResending(false);
+    }
   };
 
   const maskEmail = (email: string) => {
@@ -105,12 +208,42 @@ export function EmailVerification({ email, onVerified, onBackToLogin }: EmailVer
                 <p className="font-medium text-gray-900 dark:text-white">To verify your email:</p>
                 <ol className="list-decimal list-inside space-y-1 ml-2">
                   <li>Check your inbox (and spam folder)</li>
-                  <li>Click the verification link in the email</li>
-                  <li>Return here and click "I've Verified My Email"</li>
+                  <li>Click the "Confirm your email address" button in the email</li>
+                  <li>You'll be redirected back to this page automatically</li>
+                  <li>Click "I've Verified My Email" below to check your approval status</li>
                 </ol>
               </div>
             </div>
           </div>
+
+          {/* Email Status Indicator */}
+          {emailStatus === 'verified_pending' && (
+            <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-4">
+              <div className="flex items-start gap-3">
+                <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                <div className="text-sm">
+                  <p className="font-medium text-green-900 dark:text-green-100">Email Verified! ✓</p>
+                  <p className="text-green-700 dark:text-green-300 mt-1">
+                    Your account is now pending admin approval. You'll be able to login once approved.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {emailStatus === 'verified_approved' && (
+            <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-4">
+              <div className="flex items-start gap-3">
+                <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                <div className="text-sm">
+                  <p className="font-medium text-green-900 dark:text-green-100">Ready to Login! ✓</p>
+                  <p className="text-green-700 dark:text-green-300 mt-1">
+                    Your email is verified and your account is approved. Click below to continue.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="space-y-3">

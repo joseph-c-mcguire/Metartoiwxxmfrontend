@@ -4,10 +4,10 @@ import { Card } from '../ui/card';
 import { Input } from '../ui/input';
 import { Loader2, CheckCircle, XCircle, Mail, Calendar, User, Search } from 'lucide-react';
 import { toast } from 'sonner';
-import { projectId } from '/utils/supabase/info';
+import { supabase } from '/utils/supabase/client';
 
 interface PendingUser {
-  user_id: string;
+  id: string;
   email: string;
   username: string;
   approval_status: 'pending' | 'approved' | 'rejected';
@@ -31,22 +31,19 @@ export function UserApprovalPanel({ accessToken }: UserApprovalPanelProps) {
   const loadPendingUsers = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-2e3cda33/admin/pending-users`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-          },
-        }
-      );
+      // Query Supabase database directly
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('approval_status', 'pending')
+        .order('created_at', { ascending: false });
 
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error || 'Failed to load pending users');
+      if (error) {
+        console.error('Error loading pending users:', error);
+        throw error;
       }
 
-      const data = await response.json();
-      setPendingUsers(data.users || []);
+      setPendingUsers(data || []);
     } catch (error) {
       console.error('Error loading pending users:', error);
       toast.error('Failed to load pending users');
@@ -58,24 +55,29 @@ export function UserApprovalPanel({ accessToken }: UserApprovalPanelProps) {
   const handleApprove = async (userId: string, userEmail: string) => {
     setProcessingUsers(prev => new Set(prev).add(userId));
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-2e3cda33/admin/approve-user`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ userId }),
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error || 'Failed to approve user');
+      // Get current user for approved_by
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('Not authenticated');
       }
 
-      toast.success(`User ${userEmail} approved and notified`);
+      // Update approval status in database
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          approval_status: 'approved',
+          approved_at: new Date().toISOString(),
+          approved_by: user.id,
+        })
+        .eq('id', userId);
+
+      if (error) {
+        console.error('Error approving user:', error);
+        throw error;
+      }
+
+      toast.success(`User ${userEmail} approved successfully!`);
       await loadPendingUsers();
     } catch (error) {
       console.error('Error approving user:', error);
@@ -92,24 +94,29 @@ export function UserApprovalPanel({ accessToken }: UserApprovalPanelProps) {
   const handleReject = async (userId: string, userEmail: string) => {
     setProcessingUsers(prev => new Set(prev).add(userId));
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-2e3cda33/admin/reject-user`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ userId }),
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error || 'Failed to reject user');
+      // Get current user for approved_by
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('Not authenticated');
       }
 
-      toast.success(`User ${userEmail} rejected and notified`);
+      // Update approval status in database
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          approval_status: 'rejected',
+          approved_at: new Date().toISOString(),
+          approved_by: user.id,
+        })
+        .eq('id', userId);
+
+      if (error) {
+        console.error('Error rejecting user:', error);
+        throw error;
+      }
+
+      toast.success(`User ${userEmail} rejected`);
       await loadPendingUsers();
     } catch (error) {
       console.error('Error rejecting user:', error);
@@ -175,10 +182,10 @@ export function UserApprovalPanel({ accessToken }: UserApprovalPanelProps) {
       ) : (
         <div className="space-y-4">
           {filteredUsers.map((user) => {
-            const isProcessing = processingUsers.has(user.user_id);
+            const isProcessing = processingUsers.has(user.id);
             
             return (
-              <Card key={user.user_id} className="p-4 dark:bg-gray-750 dark:border-gray-700">
+              <Card key={user.id} className="p-4 dark:bg-gray-750 dark:border-gray-700">
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
@@ -202,7 +209,7 @@ export function UserApprovalPanel({ accessToken }: UserApprovalPanelProps) {
                   </div>
                   <div className="flex gap-2">
                     <Button
-                      onClick={() => handleApprove(user.user_id, user.email)}
+                      onClick={() => handleApprove(user.id, user.email)}
                       disabled={isProcessing}
                       className="bg-green-500 hover:bg-green-600 text-white dark:bg-green-600 dark:hover:bg-green-700"
                     >
@@ -214,7 +221,7 @@ export function UserApprovalPanel({ accessToken }: UserApprovalPanelProps) {
                       Approve
                     </Button>
                     <Button
-                      onClick={() => handleReject(user.user_id, user.email)}
+                      onClick={() => handleReject(user.id, user.email)}
                       disabled={isProcessing}
                       className="bg-red-500 hover:bg-red-600 text-white dark:bg-red-600 dark:hover:bg-red-700"
                     >
