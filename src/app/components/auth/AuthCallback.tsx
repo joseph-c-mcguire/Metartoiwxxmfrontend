@@ -58,18 +58,65 @@ export function AuthCallback({ onRegister }: AuthCallbackProps) {
         }
 
         // Check approval status from database
-        const { data: profile, error: profileError } = await supabase
+        let profile = null;
+        let profileError = null;
+        
+        const profileQuery = await supabase
           .from('user_profiles')
           .select('approval_status')
           .eq('id', session.user.id)
           .single();
+        
+        profile = profileQuery.data;
+        profileError = profileQuery.error;
 
-        if (profileError || !profile) {
+        // If profile doesn't exist, try to create it (fallback if trigger didn't fire)
+        if (!profile && profileError?.code === 'PGRST116') {
+          console.log('Profile not found, creating...');
+          const { data: newProfile, error: createError } = await supabase
+            .from('user_profiles')
+            .insert({
+              id: session.user.id,
+              email: session.user.email,
+              username: session.user.user_metadata?.username || session.user.email?.split('@')[0] || 'user',
+              approval_status: 'pending',
+              is_admin: false,
+            })
+            .select('approval_status')
+            .single();
+
+          if (createError) {
+            console.error('Error creating profile:', createError);
+            setStatus('error');
+            setMessage('Error creating user profile. Please contact support.');
+            toast.error('Error creating user profile');
+            await supabase.auth.signOut();
+            setTimeout(() => {
+              window.location.hash = '';
+              window.location.href = '/';
+            }, 2000);
+            return;
+          }
+          
+          profile = newProfile;
+        } else if (profileError && profileError.code !== 'PGRST116') {
           console.error('Error fetching profile:', profileError);
           setStatus('error');
           setMessage('Error loading profile. Please contact support.');
           toast.error('Error loading user profile');
-          // Sign out the user since we can't verify their approval status
+          await supabase.auth.signOut();
+          setTimeout(() => {
+            window.location.hash = '';
+            window.location.href = '/';
+          }, 2000);
+          return;
+        }
+
+        if (!profile) {
+          console.error('Profile not found after creation attempt');
+          setStatus('error');
+          setMessage('Error loading profile. Please contact support.');
+          toast.error('Error loading user profile');
           await supabase.auth.signOut();
           setTimeout(() => {
             window.location.hash = '';

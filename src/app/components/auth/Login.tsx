@@ -18,11 +18,40 @@ interface LoginFormData {
 interface LoginProps {
   onLogin: (email: string, needsVerification: boolean, token?: string, adminStatus?: boolean) => void;
   onSwitchToRegister: () => void;
+  onForgotPassword: () => void;
 }
 
-export function Login({ onLogin, onSwitchToRegister }: LoginProps) {
+export function Login({ onLogin, onSwitchToRegister, onForgotPassword }: LoginProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [useMagicLink, setUseMagicLink] = useState(false);
   const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>();
+
+  const handleMagicLink = async (email: string) => {
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (error) {
+        console.error('Magic link error:', error);
+        toast.error(error.message || 'Failed to send magic link');
+        setIsLoading(false);
+        return;
+      }
+
+      toast.success('✨ Magic link sent! Check your email for a login link.');
+      setUseMagicLink(false);
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Magic link error:', error);
+      toast.error('An error occurred. Please try again.');
+      setIsLoading(false);
+    }
+  };
 
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
@@ -32,21 +61,18 @@ export function Login({ onLogin, onSwitchToRegister }: LoginProps) {
 
       // If user entered username instead of email, look up their email
       if (!email.includes('@')) {
-        // It's a username, need to fetch the email from database
-        const { data: profileData, error: lookupError } = await supabase
-          .from('user_profiles')
-          .select('email')
-          .eq('username', email)
-          .single();
+        // It's a username, use the RPC function to look up email
+        const { data: emailResult, error: lookupError } = await supabase
+          .rpc('lookup_email_by_username', { p_username: email });
 
-        if (lookupError || !profileData) {
+        if (lookupError || !emailResult) {
           console.error('Username lookup error:', lookupError);
           toast.error('Invalid username or password');
           setIsLoading(false);
           return;
         }
 
-        email = profileData.email;
+        email = emailResult;
       }
 
       // Login directly with Supabase using email
@@ -108,12 +134,14 @@ export function Login({ onLogin, onSwitchToRegister }: LoginProps) {
 
       // Check approval status
       if (profile.approval_status === 'pending') {
-        toast.info('Your account is pending admin approval. Please wait for approval before logging in.');
+        toast.info('✋ Account Pending Approval\n\nYour email is verified, but an administrator needs to approve your account before you can login. You will be notified once approved.', {
+          duration: 8000,
+        });
         await supabase.auth.signOut();
         setIsLoading(false);
         return;
       } else if (profile.approval_status === 'rejected') {
-        toast.error('Your account registration was not approved. Please contact support.');
+        toast.error('❌ Account Not Approved\n\nYour account registration was not approved. Please contact support for more information.');
         await supabase.auth.signOut();
         setIsLoading(false);
         return;
@@ -160,7 +188,88 @@ export function Login({ onLogin, onSwitchToRegister }: LoginProps) {
             </p>
           </div>
 
+          {/* Auth Method Toggle */}
+          <div className="flex gap-2 mb-6">
+            <button
+              type="button"
+              onClick={() => setUseMagicLink(false)}
+              className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                !useMagicLink
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+              }`}
+              aria-pressed={!useMagicLink}
+            >
+              Password
+            </button>
+            <button
+              type="button"
+              onClick={() => setUseMagicLink(true)}
+              className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                useMagicLink
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+              }`}
+              aria-pressed={useMagicLink}
+            >
+              Magic Link
+            </button>
+          </div>
+
+          {/* Magic Link Form */}
+          {useMagicLink && (
+            <form onSubmit={(e) => { e.preventDefault(); handleMagicLink(register('emailOrUsername').name ? '' : 'test@example.com'); }} className="space-y-5">
+              <div>
+                <Label htmlFor="magicEmail" className="text-base dark:text-white">
+                  Email Address
+                </Label>
+                <div className="relative mt-1">
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" aria-hidden="true" />
+                  <Input
+                    id="magicEmail"
+                    type="email"
+                    placeholder="Enter your email"
+                    className="pl-10 h-11 text-base dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-blue-500"
+                    aria-label="Email address for magic link"
+                    required
+                    onChange={(e) => {
+                      if (e.currentTarget.value) {
+                        setTimeout(() => {}, 0);
+                      }
+                    }}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  ✨ We'll send you a secure login link via email. No password needed!
+                </p>
+              </div>
+
+              <Button
+                type="button"
+                onClick={(e) => {
+                  const emailInput = (e.currentTarget.closest('form')?.querySelector('#magicEmail') as HTMLInputElement)?.value;
+                  if (emailInput) {
+                    handleMagicLink(emailInput);
+                  }
+                }}
+                disabled={isLoading}
+                className="w-full h-11 text-base bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white font-medium focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label={isLoading ? 'Sending magic link' : 'Send magic link'}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" aria-hidden="true" />
+                    Sending...
+                  </>
+                ) : (
+                  '✨ Send Magic Link'
+                )}
+              </Button>
+            </form>
+          )}
+
           {/* Login Form */}
+          {!useMagicLink && (
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <div>
               <Label htmlFor="emailOrUsername" className="text-base dark:text-white">
@@ -235,6 +344,7 @@ export function Login({ onLogin, onSwitchToRegister }: LoginProps) {
               </label>
               <button
                 type="button"
+                onClick={onForgotPassword}
                 className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 focus:outline-none focus:underline"
                 aria-label="Forgot password"
               >
@@ -258,6 +368,7 @@ export function Login({ onLogin, onSwitchToRegister }: LoginProps) {
               )}
             </Button>
           </form>
+          )}
 
           {/* Register Link */}
           <div className="mt-6 text-center">

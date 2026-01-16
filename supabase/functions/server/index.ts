@@ -1,6 +1,7 @@
 import { Hono } from "npm:hono";
 import { cors } from "npm:hono/cors";
 import { logger } from "npm:hono/logger";
+import { jwtVerify, createRemoteJWKSet } from "npm:jose@5.2.0";
 import * as kv from "./kv_store.tsx";
 import * as auth from "./auth.tsx";
 import * as database from "./database.tsx";
@@ -9,14 +10,12 @@ import { createClient } from "jsr:@supabase/supabase-js@2.49.8";
 
 const app = new Hono();
 
-// CRITICAL: Create TWO separate Supabase clients:
-// 1. ANON client - for JWT verification (user access tokens are signed with ANON key)
-// 2. SERVICE_ROLE client - for admin operations (bypasses RLS, full database access)
-const supabaseAnon = createClient(
-  Deno.env.get("SUPABASE_URL") ?? "",
-  Deno.env.get("ANON_KEY") ?? "",
+// JWKS verification for ES256 signed JWTs (asymmetric)
+const JWKS = createRemoteJWKSet(
+  new URL("https://ktvxijislbtgqapllmuk.supabase.co/auth/v1/.well-known/jwks.json"),
 );
 
+// SERVICE_ROLE client for admin operations (bypasses RLS, full database access)
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL") ?? "",
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
@@ -453,6 +452,29 @@ app.post("/make-server-2e3cda33/convert/metar-to-iwxxm", async (c) => {
 
 // ===== ADMIN ENDPOINTS =====
 
+// Verify JWT using JWKS (for ES256 signed JWTs)
+async function verifyProjectJWT(jwt: string) {
+  try {
+    console.log(`🔑 Verifying JWT with JWKS endpoint...`);
+    const verified = await jwtVerify(jwt, JWKS);
+    const userId = verified.payload.sub as string;
+    const email = verified.payload.email as string;
+    const aal = verified.payload.aal as string;
+    const exp = verified.payload.exp as number;
+    
+    console.log(`✅ JWT verified successfully:`);
+    console.log(`   User ID: ${userId}`);
+    console.log(`   Email: ${email}`);
+    console.log(`   AAL: ${aal}`);
+    console.log(`   Expires: ${new Date(exp * 1000).toISOString()}`);
+    
+    return verified;
+  } catch (error) {
+    console.error(`❌ JWT verification failed:`, error.message);
+    throw error;
+  }
+}
+
 // Helper function to check if user is admin
 async function checkAdminAccess(accessToken: string | undefined) {
   if (!accessToken) {
@@ -462,28 +484,30 @@ async function checkAdminAccess(accessToken: string | undefined) {
 
   console.log(`🔐 checkAdminAccess: Starting verification with token prefix: ${accessToken?.substring(0, 30)}...`);
 
-  // CRITICAL: Use supabaseAnon client for JWT verification (user tokens signed with ANON key)
-  const { data: { user }, error } = await supabaseAnon.auth.getUser(accessToken);
-  
-  if (error || !user) {
-    console.error(`❌ checkAdminAccess: JWT verification failed with error:`, error);
-    console.error(`   Error code: ${error?.status}, Error message: ${error?.message}`);
+  try {
+    // Verify JWT using JWKS (asymmetric ES256 verification)
+    const verified = await verifyProjectJWT(accessToken);
+    const userId = verified.payload.sub as string;
+    const email = verified.payload.email as string;
+    
+    console.log(`✅ checkAdminAccess: JWT verified for user ${email} (${userId})`);
+
+    // Query database for admin status
+    const isAdmin = await auth.isUserAdmin(userId);
+    
+    console.log(`📋 checkAdminAccess: is_admin=${isAdmin} for user ${email}`);
+    
+    if (!isAdmin) {
+      console.error(`❌ checkAdminAccess: User ${email} is not admin`);
+      return { error: 'Admin access required', status: 403 };
+    }
+
+    console.log(`✅ checkAdminAccess: Admin access granted for ${email}`);
+    return { user: { id: userId, email } };
+  } catch (error) {
+    console.error(`❌ checkAdminAccess: JWT verification failed:`, error.message);
     return { error: 'Unauthorized', status: 401 };
   }
-
-  console.log(`✅ checkAdminAccess: User authenticated: ${user.email} (${user.id})`);
-
-  const isAdmin = await auth.isUserAdmin(user.id);
-  
-  console.log(`📋 checkAdminAccess: is_admin=${isAdmin} for user ${user.email}`);
-  
-  if (!isAdmin) {
-    console.error(`❌ checkAdminAccess: User ${user.email} is not admin`);
-    return { error: 'Admin access required', status: 403 };
-  }
-
-  console.log(`✅ checkAdminAccess: Admin access granted for ${user.email}`);
-  return { user };
 }
 
 // Get pending users for approval (admin only)

@@ -3,6 +3,20 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Accept build arguments for Vite environment variables
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY
+ARG VITE_APP_URL
+ARG VITE_BACKEND_URL
+ARG VITE_AUTH_URL
+
+# Set them as environment variables for the build
+ENV VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+ENV VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY=${VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY}
+ENV VITE_APP_URL=${VITE_APP_URL}
+ENV VITE_BACKEND_URL=${VITE_BACKEND_URL}
+ENV VITE_AUTH_URL=${VITE_AUTH_URL}
+
 # Copy package files
 COPY package.json package-lock.json* ./
 
@@ -12,7 +26,7 @@ RUN npm install
 # Copy source code
 COPY . .
 
-# Build the application
+# Build the application (Vite will use the environment variables)
 RUN npm run build
 
 # Production stage
@@ -43,7 +57,7 @@ server {
 
     # Proxy API requests to backend service
     location /api/ {
-        proxy_pass http://backend:8000/;
+        proxy_pass http://backend:8000/api/;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;

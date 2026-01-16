@@ -5,7 +5,8 @@ import { ThemeToggle } from '../ThemeToggle';
 import { UserApprovalPanel } from './UserApprovalPanel';
 import { SystemSettingsPanel } from './SystemSettingsPanel';
 import { MonitoringPanel } from './MonitoringPanel';
-import { Users, Settings, Activity, LogOut, FileText } from 'lucide-react';
+import { Users, Settings, Activity, LogOut, FileText, ChevronDown } from 'lucide-react';
+import { signOutWithScope } from '/utils/supabase/logout';
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -18,6 +19,25 @@ type AdminPanel = 'approval' | 'settings' | 'monitoring';
 
 export function AdminDashboard({ onLogout, userEmail, accessToken, onSwitchToConverter }: AdminDashboardProps) {
   const [activePanel, setActivePanel] = useState<AdminPanel>('approval');
+  const [isLogoutMenuOpen, setIsLogoutMenuOpen] = useState(false);
+
+  console.log(`🔐 AdminDashboard mounted for user: ${userEmail}`, { 
+    hasAccessToken: !!accessToken,
+    accessTokenPrefix: accessToken?.substring(0, 20) + '...'
+  });
+
+  // Log when render happens
+  console.log(`🎨 AdminDashboard rendering with activePanel=${activePanel}`);
+
+  const handleLogoutWithScope = async (scope: 'global' | 'local' | 'others') => {
+    const success = await signOutWithScope(scope);
+    if (success) {
+      setIsLogoutMenuOpen(false);
+      setTimeout(() => {
+        onLogout();
+      }, 500);
+    }
+  };
 
   const panels = [
     {
@@ -42,6 +62,9 @@ export function AdminDashboard({ onLogout, userEmail, accessToken, onSwitchToCon
       color: 'bg-purple-500 dark:bg-purple-600',
     },
   ];
+  
+  console.log(`✅ AdminDashboard panels initialized successfully (${panels.length} panels)`);
+  console.log(`   Panel icons: Users=${typeof Users}, Settings=${typeof Settings}, Activity=${typeof Activity}`);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 px-4 transition-colors">
@@ -73,14 +96,55 @@ export function AdminDashboard({ onLogout, userEmail, accessToken, onSwitchToCon
                 <span className="text-sm text-gray-600 dark:text-gray-400">Theme</span>
                 <ThemeToggle />
               </div>
-              <Button
-                variant="outline"
-                className="bg-red-500 text-white hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 border-0"
-                onClick={onLogout}
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
-              </Button>
+              
+              {/* Logout Menu */}
+              <div className="relative">
+                <Button
+                  variant="outline"
+                  className="bg-red-500 text-white hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 border-0"
+                  onClick={() => setIsLogoutMenuOpen(!isLogoutMenuOpen)}
+                  aria-label="Logout options"
+                >
+                  <LogOut className="w-4 h-4 mr-2" aria-hidden="true" />
+                  Logout
+                  <ChevronDown className="w-4 h-4 ml-1" aria-hidden="true" />
+                </Button>
+                
+                {isLogoutMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-10">
+                    <div className="p-3 space-y-2">
+                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 px-2 py-1">Sign out scope:</p>
+                      
+                      <button
+                        onClick={() => handleLogoutWithScope('local')}
+                        className="w-full text-left px-3 py-2 rounded-md text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        aria-label="Sign out from this device only"
+                      >
+                        <div className="font-medium">This Device</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Only this session</div>
+                      </button>
+                      
+                      <button
+                        onClick={() => handleLogoutWithScope('global')}
+                        className="w-full text-left px-3 py-2 rounded-md text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        aria-label="Sign out from all devices"
+                      >
+                        <div className="font-medium">All Devices</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Every logged-in session</div>
+                      </button>
+                      
+                      <button
+                        onClick={() => handleLogoutWithScope('others')}
+                        className="w-full text-left px-3 py-2 rounded-md text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        aria-label="Sign out from other devices"
+                      >
+                        <div className="font-medium">Other Devices</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Keep this session active</div>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

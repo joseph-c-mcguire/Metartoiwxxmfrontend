@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { Input } from '../ui/input';
-import { Loader2, CheckCircle, XCircle, Mail, Calendar, User, Search } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, Mail, Calendar, User, Users, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '/utils/supabase/client';
 

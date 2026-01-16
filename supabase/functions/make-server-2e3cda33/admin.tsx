@@ -1,21 +1,5 @@
 import * as kv from "./kv_store.tsx";
-
-type IWXXMVersion = "2.1" | "3.0" | "2023-1";
-type OnErrorBehavior = "skip" | "fail" | "warn";
-type LogLevel = "DEBUG" | "INFO" | "WARNING" | "ERROR" | "CRITICAL";
-
-export interface SystemSettings {
-  defaultBulletinId: string;
-  defaultIssuingCenter: string;
-  defaultIwxxmVersion: IWXXMVersion;
-  defaultStrictValidation: boolean;
-  defaultIncludeNilReasons: boolean;
-  defaultOnError: OnErrorBehavior;
-  defaultLogLevel: LogLevel;
-  allowedIcaoCodes: string[];
-}
-
-const DEFAULT_SETTINGS: SystemSettings = {
+const DEFAULT_SETTINGS = {
   defaultBulletinId: 'SAAA00',
   defaultIssuingCenter: 'KWBC',
   defaultIwxxmVersion: '3.0',
@@ -23,34 +7,35 @@ const DEFAULT_SETTINGS: SystemSettings = {
   defaultIncludeNilReasons: true,
   defaultOnError: 'warn',
   defaultLogLevel: 'INFO',
-  allowedIcaoCodes: [],
+  allowedIcaoCodes: []
 };
-
 // Get system settings
-export async function getSystemSettings(): Promise<SystemSettings> {
+export async function getSystemSettings() {
   try {
-    const settings = await kv.get<SystemSettings>('system:settings');
+    const settings = await kv.get('system:settings');
     return settings || DEFAULT_SETTINGS;
   } catch (error) {
     console.error('Error getting system settings:', error);
     return DEFAULT_SETTINGS;
   }
 }
-
 // Save system settings
-export async function saveSystemSettings(settings: SystemSettings) {
+export async function saveSystemSettings(settings) {
   try {
     await kv.set('system:settings', settings);
     console.log('System settings saved successfully');
-    return { data: settings };
+    return {
+      data: settings
+    };
   } catch (error) {
     console.error('Error saving system settings:', error);
-    return { error: error instanceof Error ? error.message : 'Unknown error saving settings' };
+    return {
+      error: error instanceof Error ? error.message : 'Unknown error saving settings'
+    };
   }
 }
-
 // Send email notification (simplified - in production would use email service like SendGrid, Resend, etc.)
-export async function sendEmailNotification(to: string, subject: string, body: string) {
+export async function sendEmailNotification(to, subject, body) {
   try {
     // In a real implementation, you would integrate with an email service
     // For now, we'll just log the email that would be sent
@@ -59,7 +44,6 @@ export async function sendEmailNotification(to: string, subject: string, body: s
     console.log(`Subject: ${subject}`);
     console.log(`Body: ${body}`);
     console.log('========================');
-    
     // Store email in KV for tracking
     const emailId = `email:${Date.now()}:${to}`;
     await kv.set(emailId, {
@@ -69,10 +53,15 @@ export async function sendEmailNotification(to: string, subject: string, body: s
       sent_at: new Date().toISOString(),
       status: 'sent' // In production: 'pending', 'sent', 'failed'
     });
-    
-    return { data: { message: 'Email sent successfully' } };
+    return {
+      data: {
+        message: 'Email sent successfully'
+      }
+    };
   } catch (error) {
     console.error('Error sending email:', error);
-    return { error: error instanceof Error ? error.message : 'Unknown error sending email' };
+    return {
+      error: error instanceof Error ? error.message : 'Unknown error sending email'
+    };
   }
 }

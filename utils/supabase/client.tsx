@@ -7,6 +7,8 @@ export const supabase = createClient(supabaseUrl, publicAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: true,
+    // PKCE Flow for better security and SSR compatibility
+    flowType: 'pkce',
   }
 });

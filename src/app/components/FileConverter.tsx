@@ -4,7 +4,7 @@ import { Textarea } from './ui/textarea';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Upload, X, Download, Copy, FileText, Loader2, Database, Settings, ChevronDown, ChevronUp, Shield } from 'lucide-react';
+import { Upload, X, Download, Copy, FileText, Loader2, Database, Settings, ChevronDown, ChevronUp, Shield, LogOut } from 'lucide-react';
 import JSZip from 'jszip';
 import { toast } from 'sonner';
 import { ThemeToggle } from './ThemeToggle';
@@ -12,6 +12,7 @@ import { DatabaseUploadDialog } from './DatabaseUploadDialog';
 import { UserPreferencesDialog } from './UserPreferencesDialog';
 import { IcaoAutocomplete } from './IcaoAutocomplete';
 import { projectId } from '/utils/supabase/info';
+import { signOutWithScope } from '/utils/supabase/logout';
 
 interface ConvertedFile {
   id: string;
@@ -57,6 +58,7 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [isPreferencesDialogOpen, setIsPreferencesDialogOpen] = useState(false);
   const [isParamsExpanded, setIsParamsExpanded] = useState(false);
+  const [isLogoutMenuOpen, setIsLogoutMenuOpen] = useState(false);
   const [conversionParams, setConversionParams] = useState<ConversionParams>({
     bulletinId: '',
     issuingCenter: '',
@@ -68,35 +70,61 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const handleLogoutWithScope = async (scope: 'global' | 'local' | 'others') => {
+    const success = await signOutWithScope(scope);
+    if (success) {
+      setIsLogoutMenuOpen(false);
+      setTimeout(() => {
+        onLogout();
+      }, 500);
+    }
+  };
+
   // Check admin access and switch to admin view
   const handleAdminAccess = async () => {
     if (!onSwitchToAdmin) return;
 
     try {
       // Verify admin status with backend
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-2e3cda33/admin/stats`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-          },
-        }
-      );
+      const endpoint = `https://${projectId}.supabase.co/functions/v1/make-server-2e3cda33/admin/stats`;
+      console.log(`🔐 Verifying admin access at: ${endpoint}`);
+      console.log(`📍 Access token type: ${typeof accessToken}`);
+      console.log(`📍 Access token length: ${accessToken?.length}`);
+      console.log(`📍 Access token prefix: ${accessToken?.substring(0, 20)}...`);
+      console.log(`📍 Access token structure: ${accessToken?.includes('.') ? 'JWT format (contains dots)' : 'Unknown format'}`);
+      
+      const response = await fetch(endpoint, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
 
+      console.log(`📊 Admin verify response status: ${response.status}`);
+      
       if (response.ok) {
+        console.log('✅ Admin access verified!');
         // User has admin access
         onSwitchToAdmin();
       } else if (response.status === 403) {
+        console.error('❌ User authenticated but not admin (403)');
         // User is authenticated but not an admin
         toast.error('Sorry, you don\'t have permissions for that.', {
           description: 'Admin access is required to view the dashboard.'
         });
       } else {
+        const errorText = await response.text();
+        console.error(`❌ Unexpected response status ${response.status}: ${errorText}`);
+        try {
+          const errorJson = JSON.parse(errorText);
+          console.error(`   Parsed error response:`, errorJson);
+        } catch (e) {
+          // Not JSON
+        }
         // Other error
         toast.error('Unable to verify admin access');
       }
     } catch (error) {
-      console.error('Error checking admin access:', error);
+      console.error('❌ Error checking admin access:', error);
       toast.error('Failed to verify admin permissions');
     }
   };
@@ -153,6 +181,10 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
     const formData = new FormData();
     formData.append('manual_text', metarContent);
     
+    console.log('🔄 Converting METAR/TAC:', metarContent.substring(0, 50));
+    console.log('📍 Access token present:', !!accessToken);
+    console.log('📍 Access token prefix:', accessToken?.substring(0, 20) + '...');
+    
     try {
       const response = await fetch('/api/convert', {
         method: 'POST',
@@ -162,8 +194,14 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
         },
       });
 
+      console.log('🔄 Conversion response status:', response.status);
+      console.log('🔄 Conversion response ok:', response.ok);
+
       // Handle authentication failure
       if (response.status === 401) {
+        console.error('❌ Authentication failed on /api/convert');
+        const text = await response.text();
+        console.error('❌ Response text:', text);
         toast.error('Session expired. Please log in again.');
         await onLogout();
         return '';
@@ -386,7 +424,8 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
                     value="converter"
                     onChange={(e) => {
                       if (e.target.value === 'admin') {
-                        handleAdminAccess();
+                        console.log('User selected admin view from dropdown');
+                        onSwitchToAdmin?.();
                       }
                     }}
                     className="px-3 py-1.5 text-sm font-medium bg-purple-600 text-white border-0 rounded-md hover:bg-purple-700 dark:bg-purple-700 dark:hover:bg-purple-800 focus:ring-2 focus:ring-purple-500 focus:outline-none cursor-pointer"
@@ -411,14 +450,55 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
                 <span className="text-sm text-gray-600 dark:text-gray-400">Theme</span>
                 <ThemeToggle />
               </div>
-              <Button 
-                variant="outline" 
-                className="bg-red-500 text-white hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 border-0"
-                aria-label="Logout from application"
-                onClick={onLogout}
-              >
-                Logout
-              </Button>
+              
+              {/* Logout Menu */}
+              <div className="relative">
+                <Button 
+                  variant="outline" 
+                  className="bg-red-500 text-white hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 border-0"
+                  aria-label="Logout options"
+                  onClick={() => setIsLogoutMenuOpen(!isLogoutMenuOpen)}
+                >
+                  <LogOut className="w-4 h-4 mr-2" aria-hidden="true" />
+                  Logout
+                  <ChevronDown className="w-4 h-4 ml-1" aria-hidden="true" />
+                </Button>
+                
+                {isLogoutMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-10">
+                    <div className="p-3 space-y-2">
+                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 px-2 py-1">Sign out scope:</p>
+                      
+                      <button
+                        onClick={() => handleLogoutWithScope('local')}
+                        className="w-full text-left px-3 py-2 rounded-md text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        aria-label="Sign out from this device only"
+                      >
+                        <div className="font-medium">This Device</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Only this session</div>
+                      </button>
+                      
+                      <button
+                        onClick={() => handleLogoutWithScope('global')}
+                        className="w-full text-left px-3 py-2 rounded-md text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        aria-label="Sign out from all devices"
+                      >
+                        <div className="font-medium">All Devices</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Every logged-in session</div>
+                      </button>
+                      
+                      <button
+                        onClick={() => handleLogoutWithScope('others')}
+                        className="w-full text-left px-3 py-2 rounded-md text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        aria-label="Sign out from other devices"
+                      >
+                        <div className="font-medium">Other Devices</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Keep this session active</div>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           <p className="text-base text-gray-600 dark:text-gray-300">
