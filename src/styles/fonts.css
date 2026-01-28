@@ -6,6 +6,9 @@
 /* Import Inter for UI elements */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
+/* Import OpenDyslexic for accessibility (dyslexia support) */
+@import url('https://fonts.googleapis.com/css2?family=OpenDyslexic:wght@400;700&display=swap');
+
 /* Apply fonts globally */
 :root {
   /* UI Font - Clean, modern sans-serif */
@@ -13,6 +16,9 @@
   
   /* Code/Data Font - Monospace for technical content */
   --font-mono: 'JetBrains Mono', 'Consolas', 'Monaco', 'Courier New', monospace;
+  
+  /* Accessibility Font - OpenDyslexic for dyslexia support */
+  --font-accessibility: 'OpenDyslexic', sans-serif;
 }
 
 /* Apply to body by default */
@@ -30,4 +36,9 @@ textarea[class*="metar"],
 textarea[class*="xml"],
 input[type="text"].monospace {
   font-family: var(--font-mono);
+}
+
+/* Accessibility font for dyslexia support */
+.accessibility-font {
+  font-family: var(--font-accessibility);
 }

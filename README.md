@@ -1,7 +1,7 @@
 
-  # METAR-2-IWXXM
+  # METAR-to-IWXXM
 
-  This is a code bundle for METAR-2-IWXXM. The original project is available at https://www.figma.com/design/ZB7OEoLx6j0Mwje8LHrFKd/METAR-2-IWXXM.
+  This is a code bundle for METAR-to-IWXXM. The original project is available at https://www.figma.com/design/ZB7OEoLx6j0Mwje8LHrFKd/METAR-to-IWXXM.
 
   ## Running the code
 

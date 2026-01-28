@@ -7,6 +7,8 @@ import { AuthCallback } from "./components/auth/AuthCallback";
 import { AdminDashboard } from "./components/admin/AdminDashboard";
 import { Toaster } from "./components/ui/sonner";
 import { ThemeProvider } from "./components/ThemeProvider";
+import { AccessibilityMenu } from "./components/AccessibilityMenu";
+import { AccessibilityProvider } from "./components/AccessibilityAnnouncement";
 import { supabase } from '/utils/supabase/client';
 
 type AuthView = 'login' | 'register' | 'verify' | 'converter' | 'admin' | 'callback';
@@ -17,6 +19,11 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [accessToken, setAccessToken] = useState<string>('');
   const [isAdmin, setIsAdmin] = useState(false);
+
+  // Set HTML lang attribute for screen readers
+  useEffect(() => {
+    document.documentElement.lang = 'en';
+  }, []);
 
   // Listen for auth state changes (including email confirmation callbacks)
   useEffect(() => {
@@ -72,6 +79,28 @@ function App() {
     };
   }, [currentView]);
 
+  // Keyboard shortcuts for accessibility
+  useEffect(() => {
+    const handleKeyboardShortcuts = (e: KeyboardEvent) => {
+      // Alt + A: Open accessibility menu
+      if (e.altKey && e.key === 'a') {
+        e.preventDefault();
+        const accessibilityButton = document.querySelector('[aria-label*="accessibility settings"]') as HTMLButtonElement;
+        accessibilityButton?.click();
+      }
+      
+      // Alt + T: Toggle theme
+      if (e.altKey && e.key === 't') {
+        e.preventDefault();
+        const themeToggle = document.querySelector('[aria-label*="Toggle theme"]') as HTMLButtonElement;
+        themeToggle?.click();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyboardShortcuts);
+    return () => window.removeEventListener('keydown', handleKeyboardShortcuts);
+  }, []);
+
   const handleLogin = (email: string, needsVerification: boolean, token?: string, adminStatus?: boolean) => {
     setUserEmail(email);
     setAccessToken(token || 'mock-token-123');
@@ -119,55 +148,66 @@ function App() {
 
   return (
     <ThemeProvider>
-      {currentView === 'login' && (
-        <Login 
-          onLogin={handleLogin}
-          onSwitchToRegister={() => setCurrentView('register')}
-        />
-      )}
+      {/* Accessibility announcement provider for screen readers */}
+      <AccessibilityProvider />
+      
+      {/* Skip to main content link for keyboard navigation */}
+      <a href="#main-content" className="skip-to-content">
+        Skip to main content
+      </a>
 
-      {currentView === 'register' && (
-        <Register 
-          onRegister={handleRegister}
-          onSwitchToLogin={() => setCurrentView('login')}
-        />
-      )}
+      <main id="main-content" role="main" aria-label="Main content">
+        {currentView === 'login' && (
+          <Login 
+            onLogin={handleLogin}
+            onSwitchToRegister={() => setCurrentView('register')}
+          />
+        )}
 
-      {currentView === 'verify' && (
-        <EmailVerification 
-          email={userEmail}
-          onVerified={handleVerified}
-          onBackToLogin={() => setCurrentView('login')}
-        />
-      )}
+        {currentView === 'register' && (
+          <Register 
+            onRegister={handleRegister}
+            onSwitchToLogin={() => setCurrentView('login')}
+          />
+        )}
 
-      {currentView === 'converter' && isAuthenticated && (
-        <FileConverter 
-          onLogout={handleLogout} 
-          userEmail={userEmail}
-          accessToken={accessToken}
-          onSwitchToAdmin={isAdmin ? handleSwitchToAdmin : undefined}
-        />
-      )}
+        {currentView === 'verify' && (
+          <EmailVerification 
+            email={userEmail}
+            onVerified={handleVerified}
+            onBackToLogin={() => setCurrentView('login')}
+          />
+        )}
 
-      {currentView === 'admin' && isAuthenticated && isAdmin && (
-        <AdminDashboard
-          onLogout={handleLogout}
-          userEmail={userEmail}
-          accessToken={accessToken}
-          onSwitchToConverter={handleSwitchToConverter}
-        />
-      )}
+        {currentView === 'converter' && isAuthenticated && (
+          <FileConverter 
+            onLogout={handleLogout} 
+            userEmail={userEmail}
+            accessToken={accessToken}
+            onSwitchToAdmin={isAdmin ? handleSwitchToAdmin : undefined}
+          />
+        )}
 
-      {currentView === 'callback' && (
-        <AuthCallback
-          onLogin={handleLogin}
-          onRegister={handleRegister}
-          onVerified={handleVerified}
-        />
-      )}
+        {currentView === 'admin' && isAuthenticated && isAdmin && (
+          <AdminDashboard
+            onLogout={handleLogout}
+            userEmail={userEmail}
+            accessToken={accessToken}
+            onSwitchToConverter={handleSwitchToConverter}
+          />
+        )}
+
+        {currentView === 'callback' && (
+          <AuthCallback
+            onLogin={handleLogin}
+            onRegister={handleRegister}
+            onVerified={handleVerified}
+          />
+        )}
+      </main>
 
       <Toaster />
+      <AccessibilityMenu />
     </ThemeProvider>
   );
 }

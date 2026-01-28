@@ -1,0 +1,455 @@
+/* ============================================
+   ACCESSIBILITY STYLES
+   ============================================ */
+
+/* ============================================
+   FONT SIZE SETTINGS
+   ============================================ */
+
+:root {
+  --base-font-size: 14px;
+}
+
+[data-font-size="small"] {
+  --base-font-size: 12px;
+}
+
+[data-font-size="medium"] {
+  --base-font-size: 14px;
+}
+
+[data-font-size="large"] {
+  --base-font-size: 16px;
+}
+
+[data-font-size="x-large"] {
+  --base-font-size: 18px;
+}
+
+html {
+  font-size: var(--base-font-size);
+}
+
+/* ============================================
+   FONT FAMILY SETTINGS
+   ============================================ */
+
+/* Default - uses Inter */
+[data-font-family="default"] body {
+  font-family: var(--font-sans);
+}
+
+/* Dyslexia-friendly - uses OpenDyslexic */
+[data-font-family="dyslexic"] body {
+  font-family: 'OpenDyslexic', var(--font-sans) !important;
+  letter-spacing: 0.05em;
+  word-spacing: 0.16em;
+  line-height: 1.6 !important;
+}
+
+[data-font-family="dyslexic"] h1,
+[data-font-family="dyslexic"] h2,
+[data-font-family="dyslexic"] h3,
+[data-font-family="dyslexic"] h4,
+[data-font-family="dyslexic"] h5,
+[data-font-family="dyslexic"] h6 {
+  font-family: 'OpenDyslexic', var(--font-sans) !important;
+  font-weight: 700;
+}
+
+/* Monospace - uses JetBrains Mono everywhere */
+[data-font-family="mono"] body {
+  font-family: var(--font-mono) !important;
+}
+
+[data-font-family="mono"] * {
+  font-family: var(--font-mono) !important;
+}
+
+/* ============================================
+   HIGH CONTRAST MODE
+   ============================================ */
+
+[data-high-contrast="true"] {
+  --background: #000000;
+  --foreground: #FFFFFF;
+  --card: #1A1A1A;
+  --card-foreground: #FFFFFF;
+  --primary: #FFFF00;
+  --primary-foreground: #000000;
+  --secondary: #00FFFF;
+  --secondary-foreground: #000000;
+  --muted: #333333;
+  --muted-foreground: #CCCCCC;
+  --accent: #FFFF00;
+  --accent-foreground: #000000;
+  --destructive: #FF0000;
+  --destructive-foreground: #FFFFFF;
+  --border: #FFFFFF;
+  --input: #FFFFFF;
+  --ring: #FFFF00;
+}
+
+[data-high-contrast="true"] * {
+  text-shadow: none !important;
+  box-shadow: none !important;
+}
+
+[data-high-contrast="true"] button,
+[data-high-contrast="true"] a,
+[data-high-contrast="true"] input,
+[data-high-contrast="true"] select,
+[data-high-contrast="true"] textarea {
+  border: 2px solid currentColor !important;
+}
+
+[data-high-contrast="true"] :focus {
+  outline: 3px solid #FFFF00 !important;
+  outline-offset: 2px !important;
+}
+
+/* ============================================
+   REDUCE MOTION
+   ============================================ */
+
+[data-reduce-motion="true"] *,
+[data-reduce-motion="true"] *::before,
+[data-reduce-motion="true"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Respect system preference too */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================
+   COLOR BLIND MODES
+   ============================================ */
+
+/* Protanopia (Red-Blind) Filter */
+[data-color-blind-mode="protanopia"] body {
+  filter: 
+    url('data:image/svg+xml,\
+      <svg xmlns="http://www.w3.org/2000/svg">\
+        <filter id="protanopia">\
+          <feColorMatrix type="matrix" values="\
+            0.567, 0.433, 0,     0, 0\
+            0.558, 0.442, 0,     0, 0\
+            0,     0.242, 0.758, 0, 0\
+            0,     0,     0,     1, 0"/>\
+        </filter>\
+      </svg>#protanopia');
+}
+
+/* Deuteranopia (Green-Blind) Filter */
+[data-color-blind-mode="deuteranopia"] body {
+  filter: 
+    url('data:image/svg+xml,\
+      <svg xmlns="http://www.w3.org/2000/svg">\
+        <filter id="deuteranopia">\
+          <feColorMatrix type="matrix" values="\
+            0.625, 0.375, 0,   0, 0\
+            0.7,   0.3,   0,   0, 0\
+            0,     0.3,   0.7, 0, 0\
+            0,     0,     0,   1, 0"/>\
+        </filter>\
+      </svg>#deuteranopia');
+}
+
+/* Tritanopia (Blue-Blind) Filter */
+[data-color-blind-mode="tritanopia"] body {
+  filter: 
+    url('data:image/svg+xml,\
+      <svg xmlns="http://www.w3.org/2000/svg">\
+        <filter id="tritanopia">\
+          <feColorMatrix type="matrix" values="\
+            0.95, 0.05,  0,     0, 0\
+            0,    0.433, 0.567, 0, 0\
+            0,    0.475, 0.525, 0, 0\
+            0,    0,     0,     1, 0"/>\
+        </filter>\
+      </svg>#tritanopia');
+}
+
+/* Monochrome (Total Color Blindness) */
+[data-color-blind-mode="monochrome"] body {
+  filter: grayscale(100%);
+}
+
+/* ============================================
+   FOCUS INDICATORS
+   ============================================ */
+
+/* Enhanced focus indicators for keyboard navigation */
+:focus-visible {
+  outline: 2px solid var(--ring) !important;
+  outline-offset: 2px !important;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+[role="link"]:focus-visible {
+  outline: 2px solid var(--ring) !important;
+  outline-offset: 2px !important;
+}
+
+/* ============================================
+   SKIP TO CONTENT LINK
+   ============================================ */
+
+.skip-to-content {
+  position: absolute;
+  top: -100px;
+  left: 0;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  padding: 0.5rem 1rem;
+  text-decoration: none;
+  z-index: 100;
+  font-weight: 600;
+  border: 2px solid var(--primary-foreground);
+}
+
+.skip-to-content:focus {
+  top: 0;
+}
+
+/* ============================================
+   TEXT SELECTION
+   ============================================ */
+
+::selection {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+::-moz-selection {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+/* High contrast selection */
+[data-high-contrast="true"] ::selection {
+  background-color: #FFFF00;
+  color: #000000;
+}
+
+/* ============================================
+   SCREEN READER ONLY
+   ============================================ */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* ============================================
+   KEYBOARD SHORTCUTS HELPER
+   ============================================ */
+
+kbd {
+  background-color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 0.125rem 0.25rem;
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+
+/* ============================================
+   LINK UNDERLINES FOR ACCESSIBILITY
+   ============================================ */
+
+/* Always underline links in high contrast mode */
+[data-high-contrast="true"] a {
+  text-decoration: underline !important;
+}
+
+/* ============================================
+   BUTTON & INTERACTIVE ELEMENTS
+   ============================================ */
+
+/* Larger touch targets for mobile accessibility */
+@media (max-width: 768px) {
+  button,
+  a,
+  input[type="checkbox"],
+  input[type="radio"],
+  select {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* ============================================
+   TOOLTIPS & ARIA LABELS
+   ============================================ */
+
+[aria-label]:hover::after,
+[data-tooltip]:hover::after {
+  content: attr(aria-label);
+  position: absolute;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+/* ============================================
+   ERROR & WARNING STATES
+   ============================================ */
+
+/* Use icons + text, not just color */
+[aria-invalid="true"],
+.error {
+  border-color: var(--destructive) !important;
+}
+
+[aria-invalid="true"]::before {
+  content: "⚠️ ";
+}
+
+/* ============================================
+   LOADING STATES
+   ============================================ */
+
+[aria-busy="true"] {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+/* ============================================
+   RESPONSIVE FONT SCALING
+   ============================================ */
+
+/* Ensure text can scale up to 200% without loss of content */
+@media (max-width: 640px) {
+  html {
+    font-size: calc(var(--base-font-size) * 0.9);
+  }
+}
+
+@media (min-width: 1920px) {
+  html {
+    font-size: calc(var(--base-font-size) * 1.1);
+  }
+}
+
+/* ============================================
+   PRINT STYLES (ACCESSIBILITY)
+   ============================================ */
+
+@media print {
+  * {
+    background: white !important;
+    color: black !important;
+  }
+  
+  a {
+    text-decoration: underline !important;
+  }
+  
+  a[href]::after {
+    content: " (" attr(href) ")";
+  }
+}
+
+/* ============================================
+   DARK MODE HIGH CONTRAST
+   ============================================ */
+
+.dark[data-high-contrast="true"] {
+  --background: #000000;
+  --foreground: #FFFFFF;
+  --card: #000000;
+  --card-foreground: #FFFFFF;
+  --primary: #FFFF00;
+  --primary-foreground: #000000;
+  --border: #FFFFFF;
+}
+
+/* ============================================
+   ANIMATION UTILITIES
+   ============================================ */
+
+/* Pulse for loading states (respects reduce motion) */
+@keyframes accessible-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.loading-pulse {
+  animation: accessible-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+[data-reduce-motion="true"] .loading-pulse {
+  animation: none;
+  opacity: 0.7;
+}
+
+/* ============================================
+   FOCUS TRAP FOR MODALS
+   ============================================ */
+
+[role="dialog"][aria-modal="true"] {
+  position: fixed;
+  z-index: 50;
+}
+
+/* ============================================
+   CUSTOM SCROLLBAR (ACCESSIBLE)
+   ============================================ */
+
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--muted);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--muted-foreground);
+  border: 2px solid var(--muted);
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--foreground);
+}
+
+[data-high-contrast="true"] ::-webkit-scrollbar-thumb {
+  background: #FFFF00;
+  border: 2px solid #000000;
+}
