@@ -57,19 +57,14 @@ function App() {
 
   // Listen for auth state changes (including email confirmation callbacks)
   useEffect(() => {
-    if (!envValid) return;
-    // Check if this is an email confirmation callback (can be from /auth/callback path or from hash at root)
+    // Check if this is an email confirmation callback
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const accessToken = hashParams.get('access_token');
     const type = hashParams.get('type');
-    const isAuthCallbackPath = window.location.pathname.includes('/auth/callback');
 
-    console.log('Path:', window.location.pathname, 'Hash accessToken:', !!accessToken, 'Type:', type);
-
-    if ((accessToken && (type === 'signup' || type === 'recovery')) || isAuthCallbackPath) {
-      // User clicked email confirmation or recovery link, or was redirected to /auth/callback
-      // AuthCallback component will handle this - don't set up the auth listener
-      console.log('Auth callback detected, showing callback view');
+    if (accessToken && type === 'signup') {
+      // User clicked email confirmation link
+      console.log('Email confirmation detected, redirecting to callback handler');
       setCurrentView('callback');
       return;
     }
@@ -89,105 +84,14 @@ function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state change:', event, session?.user?.email);
 
-      // Skip if this is a callback-triggered event (AuthCallback handles those)
-      if (currentView === 'callback') {
-        console.log('Skipping - in callback view');
-        return;
-      }
-
-      // Process SIGNED_IN and INITIAL_SESSION events (new login and existing session)
-      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
-        // Skip if we just processed this user AND we're already authenticated
-        // (allow reprocessing if not yet authenticated)
-        if (lastProcessedUserId === session.user.id && isAuthenticated) {
-          console.log('Skipping - already processed this user and authenticated');
-          return;
-        }
-        setLastProcessedUserId(session.user.id);
-
-        // Only process if email is confirmed (not from email link - those go through AuthCallback)
-        if (session.user.email_confirmed_at && currentView !== 'converter' && currentView !== 'admin' && currentView !== 'callback') {
-          console.log('User signed in with confirmed email');
-          
-          // Check approval status before allowing access
-          let profile = null;
-          let profileError = null;
-          
-          console.log(`📋 Fetching profile for user: ${session.user.id}`);
-          const profileQuery = await supabase
-            .from('user_profiles')
-            .select('approval_status, is_admin')
-            .eq('id', session.user.id)
-            .single();
-          
-          profile = profileQuery.data;
-          profileError = profileQuery.error;
-          console.log(`📋 Profile query result:`, { data: profile, error: profileError });
-
-          // If profile doesn't exist, try to create it (fallback if trigger didn't fire)
-          if (!profile && profileError?.code === 'PGRST116') {
-            console.log('Profile not found, creating...');
-            const { data: newProfile, error: createError } = await supabase
-              .from('user_profiles')
-              .insert({
-                id: session.user.id,
-                email: session.user.email,
-                username: session.user.user_metadata?.username || session.user.email?.split('@')[0] || 'user',
-                approval_status: 'pending',
-                is_admin: false,
-              })
-              .select('approval_status, is_admin')
-              .single();
-
-            if (createError) {
-              console.error('Error creating profile:', createError);
-              await supabase.auth.signOut();
-              lastProcessedUserId = null;
-              return;
-            }
-            
-            profile = newProfile;
-          } else if (profileError && profileError.code !== 'PGRST116') {
-            console.error('Error fetching profile:', profileError);
-            await supabase.auth.signOut();
-            lastProcessedUserId = null;
-            return;
-          }
-
-          if (!profile) {
-            console.error('Profile not found after creation attempt');
-            await supabase.auth.signOut();
-            lastProcessedUserId = null;
-            return;
-          }
-
-          // Only allow access if approved
-          if (profile.approval_status !== 'approved') {
-            console.log(`❌ User not approved: ${profile.approval_status}. Current profile state:`, { 
-              id: profile?.id,
-              email: session.user.email,
-              approval_status: profile?.approval_status,
-              is_admin: profile?.is_admin
-            });
-            // Don't show messages here - user should use AuthCallback or Login flow
-            await supabase.auth.signOut();
-            setLastProcessedUserId(null);
-            return;
-          }
-
-          // User is approved and email is verified - allow access
-          console.log(`✅ User approved and verified. Routing to: ${profile.is_admin ? 'admin' : 'converter'}`, { 
-            email: session.user.email,
-            approval_status: profile.approval_status,
-            is_admin: profile.is_admin,
-            profile_object: profile
-          });
-          console.log(`DEBUG: Setting isAdmin to ${profile.is_admin}`);
+      // When email is confirmed via link, Supabase creates a session
+      if (event === 'SIGNED_IN' && session?.user) {
+        // User just clicked the email confirmation link
+        if (session.user.email_confirmed_at && currentView !== 'converter' && currentView !== 'admin') {
           setUserEmail(session.user.email || '');
           setAccessToken(session.access_token);
-          setIsAuthenticated(true);
-          setIsAdmin(profile.is_admin || false);
-          setCurrentView(profile.is_admin ? 'admin' : 'converter');
+          // Redirect to verification view so they can check approval status
+          setCurrentView('verify');
         }
       }
 
@@ -307,7 +211,11 @@ function App() {
       )}
 
       {currentView === 'callback' && (
-        <AuthCallback />
+        <AuthCallback
+          onLogin={handleLogin}
+          onRegister={handleRegister}
+          onVerified={handleVerified}
+        />
       )}
 
       <Toaster />

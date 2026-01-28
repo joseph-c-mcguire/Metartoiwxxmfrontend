@@ -5,7 +5,7 @@ import { Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { Card } from '../ui/card';
 
 interface AuthCallbackProps {
-  onRegister?: (email: string) => void;
+  onRegister: (email: string) => void;
 }
 
 export function AuthCallback({ onRegister }: AuthCallbackProps) {
@@ -15,10 +15,8 @@ export function AuthCallback({ onRegister }: AuthCallbackProps) {
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        // Get the current session - Supabase automatically processes the auth hash
+        // Get the session from URL hash
         const { data: { session }, error } = await supabase.auth.getSession();
-
-        console.log('AuthCallback: Got session', !!session, 'error:', error?.message);
 
         if (error) {
           console.error('Error getting session:', error);
@@ -27,7 +25,7 @@ export function AuthCallback({ onRegister }: AuthCallbackProps) {
           toast.error('Email confirmation failed');
           setTimeout(() => {
             window.location.hash = '';
-            window.location.href = '/';
+            onRegister('');
           }, 2000);
           return;
         }
@@ -39,7 +37,7 @@ export function AuthCallback({ onRegister }: AuthCallbackProps) {
           toast.error('Email confirmation failed');
           setTimeout(() => {
             window.location.hash = '';
-            window.location.href = '/';
+            onRegister('');
           }, 2000);
           return;
         }
@@ -52,7 +50,7 @@ export function AuthCallback({ onRegister }: AuthCallbackProps) {
           toast.error('Email not confirmed');
           setTimeout(() => {
             window.location.hash = '';
-            window.location.href = '/';
+            onRegister('');
           }, 2000);
           return;
         }
@@ -157,15 +155,15 @@ export function AuthCallback({ onRegister }: AuthCallbackProps) {
         // Success - email verified AND account approved!
         console.log('Email confirmed and account approved:', session.user.email);
         setStatus('success');
-        setMessage('Email confirmed! Redirecting...');
-        toast.success('Email verified and account approved!');
+        setMessage('Email confirmed! Checking approval status...');
+        toast.success('Email verified successfully!');
 
         // Clear the hash from URL
         window.location.hash = '';
 
-        // Wait for token to be properly stored then redirect
+        // Redirect to verification screen after short delay
         setTimeout(() => {
-          window.location.href = '/';
+          onRegister(session.user.email || '');
         }, 1500);
 
       } catch (error) {
@@ -175,13 +173,13 @@ export function AuthCallback({ onRegister }: AuthCallbackProps) {
         toast.error('Email confirmation failed');
         setTimeout(() => {
           window.location.hash = '';
-          window.location.href = '/';
+          onRegister('');
         }, 2000);
       }
     };
 
     handleCallback();
-  }, []);
+  }, [onRegister]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center px-4 py-8 transition-colors">

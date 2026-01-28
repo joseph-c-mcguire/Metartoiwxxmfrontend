@@ -167,24 +167,24 @@ export function Login({ onLogin, onSwitchToRegister, onForgotPassword }: LoginPr
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center px-4 py-8 transition-colors">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4 py-8 transition-colors">
       <div className="w-full max-w-md">
         {/* Theme Toggle */}
         <div className="flex justify-end mb-4">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600 dark:text-gray-400">Theme</span>
+            <span className="text-xs text-muted-foreground uppercase tracking-wider">Display Mode</span>
             <ThemeToggle />
           </div>
         </div>
 
-        <Card className="p-8 bg-white dark:bg-gray-800 dark:border-gray-700 shadow-lg">
+        <Card className="p-8 bg-card border-border">
           {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-              Welcome Back
+          <div className="mb-8 border-b border-border pb-6">
+            <h1 className="text-xl font-semibold text-foreground mb-1 tracking-tight uppercase">
+              METAR Converter
             </h1>
-            <p className="text-base text-gray-600 dark:text-gray-300">
-              Sign in to your METAR Converter account
+            <p className="text-sm text-muted-foreground font-mono">
+              Authentication System v1.0
             </p>
           </div>
 
@@ -269,21 +269,18 @@ export function Login({ onLogin, onSwitchToRegister, onForgotPassword }: LoginPr
           )}
 
           {/* Login Form */}
-          {!useMagicLink && (
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>
-              <Label htmlFor="emailOrUsername" className="text-base dark:text-white">
-                Email or Username
+              <Label htmlFor="emailOrUsername" className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">
+                Email / Username
               </Label>
-              <div className="relative mt-1">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" aria-hidden="true" />
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" aria-hidden="true" />
                 <Input
                   id="emailOrUsername"
                   type="text"
-                  placeholder="Enter email or username"
-                  className={`pl-10 h-11 text-base dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-blue-500 ${
-                    errors.emailOrUsername ? 'border-red-500 dark:border-red-500' : ''
-                  }`}
+                  placeholder="user@domain.com or username"
+                  className={`pl-10 h-10 text-sm font-mono bg-background border-border focus:border-primary ${errors.emailOrUsername ? 'border-destructive' : ''}`}
                   {...register('emailOrUsername', {
                     required: 'Email or username is required',
                     minLength: {
@@ -296,25 +293,23 @@ export function Login({ onLogin, onSwitchToRegister, onForgotPassword }: LoginPr
                 />
               </div>
               {errors.emailOrUsername && (
-                <p id="emailOrUsername-error" className="text-sm text-red-600 dark:text-red-400 mt-1" role="alert">
+                <p id="emailOrUsername-error" className="text-xs text-destructive mt-1 font-mono" role="alert">
                   {errors.emailOrUsername.message}
                 </p>
               )}
             </div>
 
             <div>
-              <Label htmlFor="password" className="text-base dark:text-white">
+              <Label htmlFor="password" className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">
                 Password
               </Label>
-              <div className="relative mt-1">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" aria-hidden="true" />
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" aria-hidden="true" />
                 <Input
                   id="password"
                   type="password"
-                  placeholder="Enter password"
-                  className={`pl-10 h-11 text-base dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-blue-500 ${
-                    errors.password ? 'border-red-500 dark:border-red-500' : ''
-                  }`}
+                  placeholder="••••••••"
+                  className={`pl-10 h-10 text-sm font-mono bg-background border-border focus:border-primary ${errors.password ? 'border-destructive' : ''}`}
                   {...register('password', {
                     required: 'Password is required',
                     minLength: {
@@ -327,78 +322,74 @@ export function Login({ onLogin, onSwitchToRegister, onForgotPassword }: LoginPr
                 />
               </div>
               {errors.password && (
-                <p id="password-error" className="text-sm text-red-600 dark:text-red-400 mt-1" role="alert">
+                <p id="password-error" className="text-xs text-destructive mt-1 font-mono" role="alert">
                   {errors.password.message}
                 </p>
               )}
             </div>
 
-            <div className="flex items-center justify-between">
-              <label className="flex items-center">
+            <div className="flex items-center justify-between pt-2">
+              <label className="flex items-center cursor-pointer">
                 <input
                   type="checkbox"
-                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  className="w-4 h-4 text-primary border-border focus:ring-2 focus:ring-primary"
                   aria-label="Remember me"
                 />
-                <span className="ml-2 text-sm text-gray-600 dark:text-gray-300">Remember me</span>
+                <span className="ml-2 text-xs text-muted-foreground uppercase tracking-wide">Remember</span>
               </label>
               <button
                 type="button"
-                onClick={onForgotPassword}
-                className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 focus:outline-none focus:underline"
+                className="text-xs text-primary hover:text-primary/80 focus:outline-none focus:underline uppercase tracking-wide"
                 aria-label="Forgot password"
               >
-                Forgot password?
+                Reset Password
               </button>
             </div>
 
             <Button
               type="submit"
               disabled={isLoading}
-              className="w-full h-11 text-base bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white font-medium focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full h-10 text-xs"
               aria-label={isLoading ? 'Signing in, please wait' : 'Sign in to account'}
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" aria-hidden="true" />
-                  Signing in...
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />
+                  Authenticating...
                 </>
               ) : (
-                'Sign In'
+                'Authenticate'
               )}
             </Button>
           </form>
           )}
 
           {/* Register Link */}
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600 dark:text-gray-300">
-              Don't have an account?{' '}
+          <div className="mt-6 pt-6 border-t border-border">
+            <p className="text-xs text-center text-muted-foreground">
+              No account?{' '}
               <button
                 type="button"
                 onClick={onSwitchToRegister}
-                className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium focus:outline-none focus:underline"
+                className="text-primary hover:text-primary/80 font-medium focus:outline-none focus:underline uppercase tracking-wide"
                 aria-label="Go to registration page"
               >
-                Sign up
+                Register
               </button>
             </p>
           </div>
 
           {/* Admin Access Link */}
-          <div className="mt-3 text-center">
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Administrator?{' '}
-              <span className="text-purple-600 dark:text-purple-400 font-medium">
-                Login above to access admin dashboard
-              </span>
+          <div className="mt-2 text-center">
+            <p className="text-xs text-muted-foreground font-mono">
+              <span className="text-secondary">ADMIN:</span> Login to access dashboard
             </p>
           </div>
         </Card>
 
         {/* Footer */}
-        <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-6">
-          By signing in, you agree to our Terms of Service and Privacy Policy
+        <p className="text-center text-xs text-muted-foreground mt-6 font-mono">
+          Terms of Service • Privacy Policy
         </p>
       </div>
     </div>
