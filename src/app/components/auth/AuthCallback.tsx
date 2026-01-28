@@ -5,7 +5,7 @@ import { Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { Card } from '../ui/card';
 
 interface AuthCallbackProps {
-  onRegister?: (email: string) => void;
+  onRegister: (email: string) => void;
 }
 
 export function AuthCallback({ onRegister }: AuthCallbackProps) {
@@ -15,10 +15,8 @@ export function AuthCallback({ onRegister }: AuthCallbackProps) {
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        // Get the current session - Supabase automatically processes the auth hash
+        // Get the session from URL hash
         const { data: { session }, error } = await supabase.auth.getSession();
-
-        console.log('AuthCallback: Got session', !!session, 'error:', error?.message);
 
         if (error) {
           console.error('Error getting session:', error);
@@ -27,7 +25,7 @@ export function AuthCallback({ onRegister }: AuthCallbackProps) {
           toast.error('Email confirmation failed');
           setTimeout(() => {
             window.location.hash = '';
-            window.location.href = '/';
+            onRegister('');
           }, 2000);
           return;
         }
@@ -39,7 +37,7 @@ export function AuthCallback({ onRegister }: AuthCallbackProps) {
           toast.error('Email confirmation failed');
           setTimeout(() => {
             window.location.hash = '';
-            window.location.href = '/';
+            onRegister('');
           }, 2000);
           return;
         }
@@ -52,73 +50,23 @@ export function AuthCallback({ onRegister }: AuthCallbackProps) {
           toast.error('Email not confirmed');
           setTimeout(() => {
             window.location.hash = '';
-            window.location.href = '/';
+            onRegister('');
           }, 2000);
           return;
         }
 
-        // Check approval status from database
-        const { data: profile, error: profileError } = await supabase
-          .from('user_profiles')
-          .select('approval_status')
-          .eq('id', session.user.id)
-          .single();
-
-        if (profileError || !profile) {
-          console.error('Error fetching profile:', profileError);
-          setStatus('error');
-          setMessage('Error loading profile. Please contact support.');
-          toast.error('Error loading user profile');
-          // Sign out the user since we can't verify their approval status
-          await supabase.auth.signOut();
-          setTimeout(() => {
-            window.location.hash = '';
-            window.location.href = '/';
-          }, 2000);
-          return;
-        }
-
-        // Check if user is approved
-        if (profile.approval_status === 'pending') {
-          console.log('User email verified but account pending approval');
-          setStatus('success');
-          setMessage('Email verified! Your account is pending admin approval.');
-          toast.success('Email verified! Your account is pending admin approval.');
-          // Sign out the user - they need to wait for approval
-          await supabase.auth.signOut();
-          setTimeout(() => {
-            window.location.hash = '';
-            window.location.href = '/';
-          }, 2000);
-          return;
-        }
-
-        if (profile.approval_status === 'rejected') {
-          console.log('User account was rejected');
-          setStatus('error');
-          setMessage('Your account registration was not approved. Please contact support.');
-          toast.error('Account registration was not approved');
-          // Sign out the user
-          await supabase.auth.signOut();
-          setTimeout(() => {
-            window.location.hash = '';
-            window.location.href = '/';
-          }, 2000);
-          return;
-        }
-
-        // Success - email verified AND account approved!
-        console.log('Email confirmed and account approved:', session.user.email);
+        // Success!
+        console.log('Email confirmed successfully:', session.user.email);
         setStatus('success');
-        setMessage('Email confirmed! Redirecting...');
-        toast.success('Email verified and account approved!');
+        setMessage('Email confirmed! Checking approval status...');
+        toast.success('Email verified successfully!');
 
         // Clear the hash from URL
         window.location.hash = '';
 
-        // Wait for token to be properly stored then redirect
+        // Redirect to verification screen after short delay
         setTimeout(() => {
-          window.location.href = '/';
+          onRegister(session.user.email || '');
         }, 1500);
 
       } catch (error) {
@@ -128,13 +76,13 @@ export function AuthCallback({ onRegister }: AuthCallbackProps) {
         toast.error('Email confirmation failed');
         setTimeout(() => {
           window.location.hash = '';
-          window.location.href = '/';
+          onRegister('');
         }, 2000);
       }
     };
 
     handleCallback();
-  }, []);
+  }, [onRegister]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center px-4 py-8 transition-colors">

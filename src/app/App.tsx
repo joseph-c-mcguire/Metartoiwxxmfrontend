@@ -5,7 +5,7 @@ import { Register } from "./components/auth/Register";
 import { EmailVerification } from "./components/auth/EmailVerification";
 import { AuthCallback } from "./components/auth/AuthCallback";
 import { AdminDashboard } from "./components/admin/AdminDashboard";
-import { Toaster, toast } from "./components/ui/sonner";
+import { Toaster } from "./components/ui/sonner";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { supabase } from '/utils/supabase/client';
 
@@ -20,17 +20,14 @@ function App() {
 
   // Listen for auth state changes (including email confirmation callbacks)
   useEffect(() => {
-    // Check if this is an email confirmation callback (can be from /auth/callback path or from hash at root)
+    // Check if this is an email confirmation callback
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const accessToken = hashParams.get('access_token');
     const type = hashParams.get('type');
-    const isAuthCallbackPath = window.location.pathname.includes('/auth/callback');
 
-    console.log('Path:', window.location.pathname, 'Hash accessToken:', !!accessToken, 'Type:', type);
-
-    if ((accessToken && (type === 'signup' || type === 'recovery')) || isAuthCallbackPath) {
-      // User clicked email confirmation or recovery link, or was redirected to /auth/callback
-      console.log('Auth callback detected, showing callback view');
+    if (accessToken && type === 'signup') {
+      // User clicked email confirmation link
+      console.log('Email confirmation detected, redirecting to callback handler');
       setCurrentView('callback');
       return;
     }
@@ -51,41 +48,10 @@ function App() {
       if (event === 'SIGNED_IN' && session?.user) {
         // User just clicked the email confirmation link
         if (session.user.email_confirmed_at && currentView !== 'converter' && currentView !== 'admin') {
-          console.log('User signed in with confirmed email');
-          
-          // Check approval status before allowing access
-          const { data: profile, error: profileError } = await supabase
-            .from('user_profiles')
-            .select('approval_status, is_admin')
-            .eq('id', session.user.id)
-            .single();
-
-          if (profileError || !profile) {
-            console.error('Error fetching profile:', profileError);
-            toast.error('Error loading user profile. Please try logging in.');
-            await supabase.auth.signOut();
-            return;
-          }
-
-          // Only allow access if approved
-          if (profile.approval_status !== 'approved') {
-            console.log('User not approved, signing out');
-            if (profile.approval_status === 'pending') {
-              toast.info('Your account is pending admin approval.');
-            } else if (profile.approval_status === 'rejected') {
-              toast.error('Your account registration was not approved.');
-            }
-            await supabase.auth.signOut();
-            return;
-          }
-
-          // User is approved - allow access
           setUserEmail(session.user.email || '');
           setAccessToken(session.access_token);
-          setIsAuthenticated(true);
-          setIsAdmin(profile.is_admin || false);
-          // Redirect to converter
-          setCurrentView('converter');
+          // Redirect to verification view so they can check approval status
+          setCurrentView('verify');
         }
       }
 
@@ -194,7 +160,11 @@ function App() {
       )}
 
       {currentView === 'callback' && (
-        <AuthCallback />
+        <AuthCallback
+          onLogin={handleLogin}
+          onRegister={handleRegister}
+          onVerified={handleVerified}
+        />
       )}
 
       <Toaster />
