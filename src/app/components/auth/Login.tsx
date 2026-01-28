@@ -269,6 +269,7 @@ export function Login({ onLogin, onSwitchToRegister, onForgotPassword }: LoginPr
           )}
 
           {/* Login Form */}
+          {!useMagicLink && (
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>
               <Label htmlFor="emailOrUsername" className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">
