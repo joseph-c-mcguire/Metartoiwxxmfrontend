@@ -7,7 +7,8 @@ node_modules/
 /build
 /dist
 
-# Environment variables
+# Environment variables - NEVER commit .env files with credentials
+# These must be provided at build time via CI/CD or local setup
 .env
 .env.local
 .env.development.local
