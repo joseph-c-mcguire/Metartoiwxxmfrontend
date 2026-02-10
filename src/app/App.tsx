@@ -9,29 +9,17 @@ import { PasswordReset } from "./components/auth/PasswordReset";
 import { Toaster } from "./components/ui/sonner";
 import { toast } from "sonner";
 import { ThemeProvider } from "./components/ThemeProvider";
-import { supabase } from '/utils/supabase/client';
+import { isLoggedIn, logout } from '@/utils/authService';
 
-// Validate required Supabase environment variables on app load
-function validateSupabaseEnv() {
-  const url = import.meta.env.VITE_SUPABASE_URL;
-  const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
+// Validate required environment variables on app load
+function validateAuthEnv() {
+  const authServiceUrl = import.meta.env.VITE_AUTH_SERVICE_URL;
 
-  if (!url) {
-    const errorMsg = '❌ Missing VITE_SUPABASE_URL environment variable. Please check .env.local file.';
+  if (!authServiceUrl) {
+    const errorMsg = '❌ Missing VITE_AUTH_SERVICE_URL environment variable. Please check .env.local file.';
     console.error(errorMsg);
     toast.error(errorMsg);
     return false;
-  }
-
-  if (!key) {
-    const errorMsg = '❌ Missing VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY environment variable. Please check .env.local file. See .env.example for reference.';
-    console.error(errorMsg);
-    toast.error(errorMsg);
-    return false;
-  }
-
-  if (!key.startsWith('eyJ') && !key.startsWith('sb_publishable_')) {
-    console.warn('⚠️ VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY does not look like a valid Supabase key. Please verify it in your .env.local file.');
   }
 
   return true;
@@ -46,79 +34,26 @@ function App() {
   const [accessToken, setAccessToken] = useState<string>('');
   const [isAdmin, setIsAdmin] = useState(false);
   const [envValid, setEnvValid] = useState(false);
-  const [lastProcessedUserId, setLastProcessedUserId] = useState<string | null>(null);
 
   // Validate environment on mount
   useEffect(() => {
-    if (validateSupabaseEnv()) {
+    if (validateAuthEnv()) {
       setEnvValid(true);
+      
+      // Check if user is already logged in
+      if (isLoggedIn()) {
+        setIsAuthenticated(true);
+        // Redirect to converter or admin view based on stored data
+        setCurrentView('converter');
+      }
     }
   }, []);
-
-  // Listen for auth state changes (including email confirmation callbacks)
-  useEffect(() => {
-    // Check if this is an email confirmation callback
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const accessToken = hashParams.get('access_token');
-    const type = hashParams.get('type');
-
-    if (accessToken && type === 'signup') {
-      // User clicked email confirmation link
-      console.log('Email confirmation detected, redirecting to callback handler');
-      setCurrentView('callback');
-      return;
-    }
-
-    // Check for existing session on mount
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        console.log('Existing session found:', session.user.email);
-        // Don't auto-login here, let the user go through the normal flow
-      }
-    });
-
-    // Track if we've already processed this user to prevent duplicate processing
-    // (this is a state variable now to persist across re-renders)
-
-    // Listen for auth state changes (only for actual login/logout)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state change:', event, session?.user?.email);
-
-      // When email is confirmed via link, Supabase creates a session
-      if (event === 'SIGNED_IN' && session?.user) {
-        // User just clicked the email confirmation link
-        if (session.user.email_confirmed_at && currentView !== 'converter' && currentView !== 'admin') {
-          setUserEmail(session.user.email || '');
-          setAccessToken(session.access_token);
-          // Redirect to verification view so they can check approval status
-          setCurrentView('verify');
-        }
-      }
-
-      // Handle sign out
-      if (event === 'SIGNED_OUT') {
-        setIsAuthenticated(false);
-        setUserEmail('');
-        setAccessToken('');
-        setIsAdmin(false);
-        setLastProcessedUserId(null);
-        if (currentView !== 'login' && currentView !== 'register') {
-          setCurrentView('login');
-        }
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [currentView, lastProcessedUserId]);
 
   const handleLogin = (email: string, needsVerification: boolean, token?: string, adminStatus?: boolean) => {
     console.log(`🔐 handleLogin called with:`, { email, needsVerification, adminStatus, hasToken: !!token });
     setUserEmail(email);
-    setAccessToken(token || 'mock-token-123');
+    setAccessToken(token || 'auth-service-token');
     setIsAdmin(adminStatus || false);
-    console.log(`DEBUG: Set isAdmin to ${adminStatus || false}`);
     
     if (needsVerification) {
       setCurrentView('verify');
@@ -143,8 +78,12 @@ function App() {
   };
 
   const handleLogout = async () => {
-    // Sign out from Supabase
-    await supabase.auth.signOut();
+    // Logout through auth service
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
     
     setIsAuthenticated(false);
     setUserEmail('');

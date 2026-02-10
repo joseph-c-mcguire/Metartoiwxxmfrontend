@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -6,14 +6,15 @@ import { Card } from '../ui/card';
 import { Mail, ArrowLeft, Loader2, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import { ThemeToggle } from '../ThemeToggle';
-import { supabase } from '/utils/supabase/client';
+import { requestPasswordReset, confirmPasswordReset } from '@/utils/authService';
 
 interface PasswordResetProps {
   onBackToLogin: () => void;
+  resetToken?: string; // Token from URL callback
 }
 
-export function PasswordReset({ onBackToLogin }: PasswordResetProps) {
-  const [step, setStep] = useState<'request' | 'reset'>('request');
+export function PasswordReset({ onBackToLogin, resetToken }: PasswordResetProps) {
+  const [step, setStep] = useState<'request' | 'reset'>(!resetToken ? 'request' : 'reset');
   const [email, setEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -31,27 +32,19 @@ export function PasswordReset({ onBackToLogin }: PasswordResetProps) {
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      });
-
-      if (error) {
-        console.error('Password reset error:', error);
-        toast.error(error.message || 'Failed to send password reset email');
-        setIsLoading(false);
-        return;
-      }
-
+      await requestPasswordReset(email);
       toast.success('Password reset email sent! Check your inbox.');
+      setEmail('');
     } catch (error) {
       console.error('Password reset error:', error);
-      toast.error('An error occurred. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to send password reset email';
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Step 2: Update password (called after user clicks reset link and is redirected)
+  // Step 2: Update password (called after user clicks reset link)
   const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -65,141 +58,136 @@ export function PasswordReset({ onBackToLogin }: PasswordResetProps) {
       return;
     }
 
-    if (newPassword.length < 8) {
-      toast.error('Password must be at least 8 characters');
+    if (newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+
+    if (!resetToken) {
+      toast.error('Reset token not found');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
-
-      if (error) {
-        console.error('Password update error:', error);
-        toast.error(error.message || 'Failed to update password');
-        setIsLoading(false);
-        return;
-      }
-
+      await confirmPasswordReset(resetToken, newPassword);
       toast.success('✓ Password updated successfully! Redirecting to login...');
       setTimeout(() => {
         onBackToLogin();
       }, 2000);
     } catch (error) {
       console.error('Password update error:', error);
-      toast.error('An error occurred. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update password';
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center px-4 py-8 transition-colors">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4 py-8 transition-colors">
       <div className="w-full max-w-md">
         {/* Theme Toggle */}
         <div className="flex justify-end mb-4">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600 dark:text-gray-400">Theme</span>
+            <span className="text-xs text-muted-foreground uppercase tracking-wider">Display Mode</span>
             <ThemeToggle />
           </div>
         </div>
 
-        <Card className="p-8 bg-white dark:bg-gray-800 dark:border-gray-700 shadow-lg">
+        <Card className="p-8 bg-card border-border">
           {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+          <div className="mb-8 border-b border-border pb-6">
+            <h1 className="text-xl font-semibold text-foreground mb-1 tracking-tight uppercase">
               Reset Password
             </h1>
-            <p className="text-base text-gray-600 dark:text-gray-300">
+            <p className="text-sm text-muted-foreground font-mono">
               {step === 'request'
-                ? 'Enter your email to receive a password reset link'
-                : 'Create a new password for your account'}
+                ? 'Recover your account access'
+                : 'Create a new password'}
             </p>
           </div>
 
           {/* Step 1: Request Reset Email */}
           {step === 'request' && (
-            <form onSubmit={handleResetRequest} className="space-y-5">
+            <form onSubmit={handleResetRequest} className="space-y-4">
               <div>
-                <Label htmlFor="email" className="text-base dark:text-white">
+                <Label htmlFor="email" className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">
                   Email Address
                 </Label>
-                <div className="relative mt-1">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" aria-hidden="true" />
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" aria-hidden="true" />
                   <Input
                     id="email"
                     type="email"
-                    placeholder="Enter your email"
+                    placeholder="user@domain.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10 h-11 text-base dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-blue-500"
+                    className="pl-10 h-10 text-sm font-mono bg-background border-border focus:border-primary"
                     aria-label="Email address"
                     required
                   />
                 </div>
               </div>
 
+              <p className="text-xs text-muted-foreground font-mono">
+                We'll send a recovery link to your email address.
+              </p>
+
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-11 text-base bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white font-medium focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full h-10 text-xs"
                 aria-label={isLoading ? 'Sending reset email' : 'Send reset email'}
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" aria-hidden="true" />
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />
                     Sending...
                   </>
                 ) : (
                   'Send Reset Email'
                 )}
               </Button>
-
-              <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-                We'll send you a secure link to reset your password. Check your inbox (and spam folder) for the email.
-              </p>
             </form>
           )}
 
           {/* Step 2: Update Password (After clicking reset link) */}
           {step === 'reset' && (
-            <form onSubmit={handlePasswordUpdate} className="space-y-5">
+            <form onSubmit={handlePasswordUpdate} className="space-y-4">
               <div>
-                <Label htmlFor="newPassword" className="text-base dark:text-white">
+                <Label htmlFor="newPassword" className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">
                   New Password
                 </Label>
-                <div className="relative mt-1">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" aria-hidden="true" />
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" aria-hidden="true" />
                   <Input
                     id="newPassword"
                     type="password"
-                    placeholder="Create a new password"
+                    placeholder="••••••••"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="pl-10 h-11 text-base dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-blue-500"
+                    className="pl-10 h-10 text-sm font-mono bg-background border-border focus:border-primary"
                     aria-label="New password"
                     required
                   />
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  At least 8 characters
-                </p>
               </div>
 
               <div>
-                <Label htmlFor="confirmPassword" className="text-base dark:text-white">
+                <Label htmlFor="confirmPassword" className="text-xs uppercase tracking-wider text-muted-foreground mb-2 block">
                   Confirm Password
                 </Label>
-                <div className="relative mt-1">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" aria-hidden="true" />
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" aria-hidden="true" />
                   <Input
                     id="confirmPassword"
                     type="password"
-                    placeholder="Confirm your password"
+                    placeholder="••••••••"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="pl-10 h-11 text-base dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-blue-500"
+                    className="pl-10 h-10 text-sm font-mono bg-background border-border focus:border-primary"
                     aria-label="Confirm password"
                     required
                   />
@@ -209,12 +197,12 @@ export function PasswordReset({ onBackToLogin }: PasswordResetProps) {
               <Button
                 type="submit"
                 disabled={isLoading || !newPassword || !confirmPassword}
-                className="w-full h-11 text-base bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white font-medium focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full h-10 text-xs"
                 aria-label={isLoading ? 'Updating password' : 'Update password'}
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" aria-hidden="true" />
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />
                     Updating...
                   </>
                 ) : (
@@ -228,7 +216,7 @@ export function PasswordReset({ onBackToLogin }: PasswordResetProps) {
           <button
             type="button"
             onClick={onBackToLogin}
-            className="w-full mt-6 flex items-center justify-center text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium focus:outline-none focus:underline"
+            className="w-full mt-6 flex items-center justify-center text-xs text-primary hover:text-primary/80 font-medium focus:outline-none focus:underline uppercase tracking-wide"
             aria-label="Back to login"
           >
             <ArrowLeft className="w-4 h-4 mr-2" aria-hidden="true" />
@@ -237,8 +225,8 @@ export function PasswordReset({ onBackToLogin }: PasswordResetProps) {
         </Card>
 
         {/* Footer */}
-        <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-6">
-          By signing in, you agree to our Terms of Service and Privacy Policy
+        <p className="text-center text-xs text-muted-foreground mt-6 font-mono">
+          Terms of Service • Privacy Policy
         </p>
       </div>
     </div>

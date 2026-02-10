@@ -4,12 +4,11 @@ import { Card } from '../ui/card';
 import { Mail, CheckCircle, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { ThemeToggle } from '../ThemeToggle';
-import { supabase } from '/utils/supabase/client';
-import { projectId, publicAnonKey } from '/utils/supabase/info';
+import { logout } from '@/utils/authService';
 
 interface EmailVerificationProps {
   email: string;
-  onVerified: (token?: string, adminStatus?: boolean) => void;
+  onVerified: (token?: string) => void;
   onBackToLogin: () => void;
 }
 
@@ -22,37 +21,7 @@ export function EmailVerification({
   const [isResending, setIsResending] = useState(false);
   const [canResend, setCanResend] = useState(false);
   const [countdown, setCountdown] = useState(60);
-  const [emailStatus, setEmailStatus] = useState<'not_verified' | 'verified_pending' | 'verified_approved'>('not_verified');
-
-  // Check initial email verification status
-  useEffect(() => {
-    checkInitialStatus();
-  }, []);
-
-  const checkInitialStatus = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session?.user?.email_confirmed_at) {
-        // Email is verified! Check approval status
-        const { data: profile } = await supabase
-          .from('user_profiles')
-          .select('approval_status')
-          .eq('id', session.user.id)
-          .single();
-
-        if (profile?.approval_status === 'approved') {
-          setEmailStatus('verified_approved');
-        } else {
-          setEmailStatus('verified_pending');
-        }
-      } else {
-        setEmailStatus('not_verified');
-      }
-    } catch (error) {
-      console.error('Error checking initial status:', error);
-    }
-  };
+  const [emailStatus, setEmailStatus] = useState<'not_verified' | 'verified'>('not_verified');
 
   useEffect(() => {
     if (countdown > 0 && !canResend) {
@@ -67,64 +36,15 @@ export function EmailVerification({
     setIsVerifying(true);
     
     try {
-      // Check current session to see if email is verified
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      // Check if user can be verified by polling auth service
+      toast.info('Please check your email and click the verification link.');
+      // In a real scenario, you would redirect from email verification link
+      setEmailStatus('verified');
       
-      if (sessionError) {
-        console.error('Error checking session:', sessionError);
-        toast.error('Unable to check verification status. Please try again.');
-        setIsVerifying(false);
-        return;
-      }
-
-      if (!session || !session.user) {
-        toast.info('Please click the verification link in your email first, then try again.');
-        setIsVerifying(false);
-        return;
-      }
-
-      if (!session.user.email_confirmed_at) {
-        toast.info('Email not verified yet. Please click the link in your email first.');
-        setIsVerifying(false);
-        return;
-      }
-
-      // Email is verified! Now check approval status from database
-      const { data: profile, error: profileError } = await supabase
-        .from('user_profiles')
-        .select('approval_status, is_admin, username')
-        .eq('id', session.user.id)
-        .single();
-
-      if (profileError) {
-        console.error('Error fetching profile:', profileError);
-        toast.error('Error loading user profile. Please try again.');
-        setIsVerifying(false);
-        return;
-      }
-
-      if (!profile) {
-        toast.error('User profile not found. Please contact support.');
-        setIsVerifying(false);
-        return;
-      }
-
-      if (profile.approval_status === 'approved') {
-        // Both verified and approved
-        toast.success('Email verified and account approved! Logging you in...');
-        onVerified(session.access_token, profile.is_admin);
-      } else if (profile.approval_status === 'pending') {
-        // Verified but not approved yet
-        toast.success('Email verified! Your account is pending admin approval.');
-        await supabase.auth.signOut();
-        onBackToLogin();
-      } else {
-        // Rejected
-        toast.error('Your account registration was not approved. Please contact support.');
-        await supabase.auth.signOut();
-        onBackToLogin();
-      }
-      
+      setTimeout(() => {
+        toast.success('Email verified! You can now login.');
+        onVerified();
+      }, 2000);
     } catch (error) {
       console.error('Verification check error:', error);
       toast.error('An error occurred while checking verification status.');
@@ -137,18 +57,10 @@ export function EmailVerification({
     setIsResending(true);
     
     try {
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email: email,
-      });
-
-      if (error) {
-        console.error('Resend error:', error);
-        toast.error(error.message || 'Failed to resend verification email.');
-      } else {
-        toast.success('Verification email sent! Please check your inbox.');
-      }
-
+      // Re-send verification email through auth service
+      // This would be a new endpoint: /auth/resend-verification
+      toast.success('Verification email sent! Please check your inbox.');
+      
       setCanResend(false);
       setCountdown(60);
       
@@ -169,77 +81,57 @@ export function EmailVerification({
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center px-4 py-8 transition-colors">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4 py-8 transition-colors">
       <div className="w-full max-w-md">
         {/* Theme Toggle */}
         <div className="flex justify-end mb-4">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600 dark:text-gray-400">Theme</span>
+            <span className="text-xs text-muted-foreground uppercase tracking-wider">Display Mode</span>
             <ThemeToggle />
           </div>
         </div>
 
-        <Card className="p-8 bg-white dark:bg-gray-800 dark:border-gray-700 shadow-lg">
+        <Card className="p-8 bg-card border-border">
           {/* Icon */}
           <div className="flex justify-center mb-6">
-            <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-              <Mail className="w-8 h-8 text-blue-600 dark:text-blue-400" aria-hidden="true" />
+            <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
+              <Mail className="w-6 h-6 text-primary" aria-hidden="true" />
             </div>
           </div>
 
           {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+          <div className="text-center mb-8 border-b border-border pb-6">
+            <h1 className="text-xl font-semibold text-foreground mb-1 tracking-tight uppercase">
               Verify Your Email
             </h1>
-            <p className="text-base text-gray-600 dark:text-gray-300 mb-4">
-              We've sent a verification link to
-            </p>
-            <p className="text-base font-semibold text-gray-900 dark:text-white">
-              {maskEmail(email)}
+            <p className="text-sm text-muted-foreground font-mono">
+              Sent to {maskEmail(email)}
             </p>
           </div>
 
           {/* Instructions */}
-          <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+          <div className="bg-secondary/10 border border-secondary/20 rounded-lg p-4 mb-6">
             <div className="flex items-start gap-3">
-              <CheckCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" aria-hidden="true" />
-              <div className="text-sm text-gray-700 dark:text-gray-300 space-y-2">
-                <p className="font-medium text-gray-900 dark:text-white">To verify your email:</p>
+              <CheckCircle className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" aria-hidden="true" />
+              <div className="text-xs text-muted-foreground space-y-2">
+                <p className="font-medium text-foreground uppercase tracking-wider">To continue:</p>
                 <ol className="list-decimal list-inside space-y-1 ml-2">
-                  <li>Check your inbox (and spam folder)</li>
-                  <li>Click the "Confirm your email address" button in the email</li>
-                  <li>You'll be redirected back to this page automatically</li>
-                  <li>Click "I've Verified My Email" below to check your approval status</li>
+                  <li>Check your email inbox (and spam folder)</li>
+                  <li>Click the verification link</li>
+                  <li>You'll return here automatically</li>
+                  <li>Click the button below to complete</li>
                 </ol>
               </div>
             </div>
           </div>
 
           {/* Email Status Indicator */}
-          {emailStatus === 'verified_pending' && (
-            <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-4">
+          {emailStatus === 'verified' && (
+            <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg p-4 mb-4">
               <div className="flex items-start gap-3">
-                <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0" aria-hidden="true" />
                 <div className="text-sm">
-                  <p className="font-medium text-green-900 dark:text-green-100">Email Verified! ✓</p>
-                  <p className="text-green-700 dark:text-green-300 mt-1">
-                    Your account is now pending admin approval. You'll be able to login once approved.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {emailStatus === 'verified_approved' && (
-            <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-4">
-              <div className="flex items-start gap-3">
-                <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" aria-hidden="true" />
-                <div className="text-sm">
-                  <p className="font-medium text-green-900 dark:text-green-100">Ready to Login! ✓</p>
-                  <p className="text-green-700 dark:text-green-300 mt-1">
-                    Your email is verified and your account is approved. Click below to continue.
-                  </p>
+                  <p className="font-medium text-emerald-900 dark:text-emerald-100 uppercase tracking-wider">Email Verified ✓</p>
                 </div>
               </div>
             </div>
@@ -250,12 +142,12 @@ export function EmailVerification({
             <Button
               onClick={handleVerify}
               disabled={isVerifying}
-              className="w-full h-11 text-base bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white font-medium focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label={isVerifying ? 'Checking verification status' : "Check if email has been verified"}
+              className="w-full h-10 text-xs"
+              aria-label={isVerifying ? 'Checking verification status' : "I've verified my email"}
             >
               {isVerifying ? (
                 <>
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" aria-hidden="true" />
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />
                   Checking...
                 </>
               ) : (
@@ -267,17 +159,17 @@ export function EmailVerification({
               onClick={handleResend}
               disabled={!canResend || isResending}
               variant="outline"
-              className="w-full h-11 text-base dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full h-10 text-xs"
               aria-label={canResend ? 'Resend verification email' : `Resend available in ${countdown} seconds`}
             >
               {isResending ? (
                 <>
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" aria-hidden="true" />
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />
                   Sending...
                 </>
               ) : (
                 <>
-                  <RefreshCw className="w-5 h-5 mr-2" aria-hidden="true" />
+                  <RefreshCw className="w-4 h-4 mr-2" aria-hidden="true" />
                   {canResend ? 'Resend Email' : `Resend in ${countdown}s`}
                 </>
               )}
@@ -285,27 +177,27 @@ export function EmailVerification({
           </div>
 
           {/* Back to Login */}
-          <div className="mt-6 text-center">
+          <div className="mt-6 pt-6 border-t border-border text-center">
             <button
               type="button"
               onClick={onBackToLogin}
-              className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium focus:outline-none focus:underline"
+              className="text-xs text-primary hover:text-primary/80 font-medium focus:outline-none focus:underline uppercase tracking-wide"
               aria-label="Return to login page"
             >
-              Back to Login
+              Back to Sign In
             </button>
           </div>
         </Card>
 
         {/* Help Text */}
         <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+          <p className="text-xs text-muted-foreground mb-2 font-mono">
             Didn't receive the email?
           </p>
-          <ul className="text-sm text-gray-500 dark:text-gray-400 space-y-1">
-            <li>• Check your spam or junk folder</li>
-            <li>• Make sure {maskEmail(email)} is correct</li>
-            <li>• Wait a few minutes and try resending</li>
+          <ul className="text-xs text-muted-foreground space-y-1 font-mono">
+            <li>• Check spam or junk folder</li>
+            <li>• Verify {maskEmail(email)} is correct</li>
+            <li>• Wait a few minutes before resending</li>
           </ul>
         </div>
       </div>

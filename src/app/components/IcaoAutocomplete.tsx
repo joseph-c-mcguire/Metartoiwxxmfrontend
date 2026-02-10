@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Label } from './ui/label';
 import { Input } from './ui/input';
-import airports from 'airport-codes';
+import { airports } from '../../utils/airportsData';
 import { CheckCircle, AlertCircle } from 'lucide-react';
 
 interface IcaoAutocompleteProps {
@@ -43,12 +43,7 @@ export function IcaoAutocomplete({
 
   const validateIcao = (code: string): boolean => {
     if (!code || code.length !== 4) return false;
-    try {
-      const airport = airports.findWhere({ icao: code.toUpperCase() });
-      return airport !== undefined;
-    } catch {
-      return false;
-    }
+    return airports.isValid(code);
   };
 
   const handleInputChange = (inputValue: string) => {
@@ -71,14 +66,7 @@ export function IcaoAutocomplete({
 
     if (upperValue.length >= 2) {
       try {
-        const allAirports = airports.toJSON();
-        const filtered = allAirports
-          .filter((apt: any) => {
-            const icao = apt.icao || '';
-            return icao.toUpperCase().startsWith(upperValue);
-          })
-          .slice(0, 10);
-        
+        const filtered = airports.searchByIcao(upperValue, 10);
         setSuggestions(filtered);
         setShowSuggestions(filtered.length > 0);
       } catch (error) {

@@ -4,7 +4,7 @@ import { Textarea } from './ui/textarea';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Upload, X, Download, Copy, FileText, Loader2, Database, Settings, ChevronDown, ChevronUp, Shield, LogOut } from 'lucide-react';
+import { Upload, X, Download, Copy, FileText, Loader2, Database, Settings, ChevronDown, ChevronUp, Shield, LogOut, AlertCircle, XCircle } from 'lucide-react';
 import JSZip from 'jszip';
 import { toast } from 'sonner';
 import { ThemeToggle } from './ThemeToggle';
@@ -13,6 +13,7 @@ import { UserPreferencesDialog } from './UserPreferencesDialog';
 import { IcaoAutocomplete } from './IcaoAutocomplete';
 import { projectId } from '/utils/supabase/info';
 import { signOutWithScope } from '/utils/supabase/logout';
+import { convertMetarToIwxxm as callBackendConversion } from '/utils/api';
 
 interface ConvertedFile {
   id: string;
@@ -55,6 +56,7 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
   const [manualInput, setManualInput] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
+  const [conversionStatus, setConversionStatus] = useState<{ type: 'idle' | 'loading' | 'timeout' | 'error'; message?: string }>({ type: 'idle' });
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [isPreferencesDialogOpen, setIsPreferencesDialogOpen] = useState(false);
   const [isParamsExpanded, setIsParamsExpanded] = useState(false);
@@ -176,32 +178,6 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
     }
   };
 
-  // Mock conversion function - converts METAR to IWXXM XML
-  const convertMetarToIwxxm = (metarContent: string): string => {
-    const lines = metarContent.trim().split('\n').filter(line => line.trim());
-    let iwxxmXml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
-    iwxxmXml += `<IWXXM xmlns="http://icao.int/iwxxm/3.0">\n`;
-    
-    lines.forEach((line, index) => {
-      const parts = line.trim().split(/\s+/);
-      iwxxmXml += `  <MeteorologicalAerodromeObservation>\n`;
-      iwxxmXml += `    <observationTime>${new Date().toISOString()}</observationTime>\n`;
-      iwxxmXml += `    <content>${line}</content>\n`;
-      
-      if (parts.length > 0) {
-        iwxxmXml += `    <station>${parts[0]}</station>\n`;
-      }
-      if (parts.length > 1) {
-        iwxxmXml += `    <timestamp>${parts[1]} ${parts[2] || ''}</timestamp>\n`;
-      }
-      
-      iwxxmXml += `  </MeteorologicalAerodromeObservation>\n`;
-    });
-    
-    iwxxmXml += `</IWXXM>`;
-    return iwxxmXml;
-  };
-
   const handleFileSelect = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
@@ -248,41 +224,82 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
     }
 
     setIsConverting(true);
-    
-    // Simulate conversion delay for better UX
-    await new Promise(resolve => setTimeout(resolve, 800));
+    setConversionStatus({ type: 'loading', message: 'Converting...' });
 
-    const newConvertedFiles: ConvertedFile[] = [];
+    try {
+      const newConvertedFiles: ConvertedFile[] = [];
 
-    // Convert pending files
-    pendingFiles.forEach(file => {
-      const converted = convertMetarToIwxxm(file.content);
-      newConvertedFiles.push({
-        id: `converted-${file.id}`,
-        originalName: file.name,
-        originalContent: file.content,
-        convertedContent: converted,
-        timestamp: Date.now(),
+      // Prepare files for conversion
+      const filesToConvert: File[] = pendingFiles.map(file => {
+        return new File([file.content], file.name, { type: 'text/plain' });
       });
-    });
 
-    // Convert manual input if provided
-    if (manualInput.trim()) {
-      const converted = convertMetarToIwxxm(manualInput);
-      newConvertedFiles.push({
-        id: `manual-${Date.now()}`,
-        originalName: 'manual_input.txt',
-        originalContent: manualInput,
-        convertedContent: converted,
-        timestamp: Date.now(),
+      console.log('[FileConverter] Starting conversion with:', {
+        manualInput: manualInput.trim() ? 'provided' : 'none',
+        fileCount: filesToConvert.length,
+        accessToken: accessToken ? `${accessToken.substring(0, 20)}...` : 'MISSING',
       });
+
+      // Call backend API for conversion with timeout and token
+      const response = await callBackendConversion({
+        manualText: manualInput.trim() || undefined,
+        files: filesToConvert.length > 0 ? filesToConvert : undefined,
+        accessToken: accessToken,
+      });
+
+      console.log('[FileConverter] Conversion response:', response);
+
+      // Process response and create converted file entries
+      if (response.results && Array.isArray(response.results)) {
+        response.results.forEach((result: any, index: number) => {
+          const originalFile = index < pendingFiles.length 
+            ? pendingFiles[index]
+            : { name: 'manual_input.txt', content: manualInput };
+          
+          newConvertedFiles.push({
+            id: `converted-${Date.now()}-${index}`,
+            originalName: originalFile.name,
+            originalContent: originalFile.content,
+            convertedContent: result.iwxxm_xml || result.xml || result.content || '',
+            timestamp: Date.now(),
+          });
+        });
+      }
+
+      if (newConvertedFiles.length === 0) {
+        toast.error('No files were converted');
+        setConversionStatus({ type: 'error', message: 'No files were converted' });
+        setIsConverting(false);
+        return;
+      }
+
+      setConvertedFiles(prev => [...newConvertedFiles, ...prev]);
+      setPendingFiles([]);
+      setManualInput('');
+      setConversionStatus({ type: 'idle' });
+      toast.success(`Successfully converted ${newConvertedFiles.length} file(s)`);
+    } catch (error) {
+      console.error('[FileConverter] Conversion error:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : 'Conversion failed. Please check the input and try again.';
+      const isTimeout = errorMessage.includes('timeout') || errorMessage.includes('unreachable');
+      const isAuthError = errorMessage.includes('401') || errorMessage.includes('unauthorized') || errorMessage.includes('Unauthorized');
+      
+      if (isTimeout) {
+        const timeoutMsg = 'Conversion timeout - Backend may be unreachable. Please check if the API server is running.';
+        setConversionStatus({ type: 'timeout', message: timeoutMsg });
+        toast.error(timeoutMsg);
+      } else if (isAuthError) {
+        const authMsg = 'Authentication failed. Please ensure you are logged in.';
+        setConversionStatus({ type: 'error', message: authMsg });
+        toast.error(authMsg);
+      } else {
+        setConversionStatus({ type: 'error', message: errorMessage });
+        toast.error(errorMessage);
+      }
+    } finally {
+      setIsConverting(false);
     }
-
-    setConvertedFiles(prev => [...newConvertedFiles, ...prev]);
-    setPendingFiles([]);
-    setManualInput('');
-    setIsConverting(false);
-    toast.success(`Successfully converted ${newConvertedFiles.length} file(s)`);
   };
 
   const handleDownloadSingle = (file: ConvertedFile) => {
@@ -372,6 +389,7 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
   const handleClear = () => {
     setPendingFiles([]);
     setManualInput('');
+    setConversionStatus({ type: 'idle' });
     toast.info('Queue cleared');
   };
 
@@ -698,6 +716,45 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
             Clear
           </Button>
         </div>
+
+        {/* Conversion Status Display */}
+        {conversionStatus.type !== 'idle' && (
+          <div className={`mb-8 p-4 rounded-lg border-2 flex items-start gap-3 ${
+            conversionStatus.type === 'loading' 
+              ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700' 
+              : conversionStatus.type === 'timeout'
+              ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700'
+              : 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700'
+          }`}>
+            <div className="pt-1">
+              {conversionStatus.type === 'loading' ? (
+                <Loader2 className="w-5 h-5 text-blue-600 dark:text-blue-400 animate-spin flex-shrink-0" aria-hidden="true" />
+              ) : conversionStatus.type === 'timeout' ? (
+                <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" aria-hidden="true" />
+              ) : (
+                <XCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" aria-hidden="true" />
+              )}
+            </div>
+            <div className="flex-1">
+              <p className={`font-semibold ${
+                conversionStatus.type === 'loading'
+                  ? 'text-blue-900 dark:text-blue-100'
+                  : 'text-red-900 dark:text-red-100'
+              }`}>
+                {conversionStatus.type === 'loading' ? 'Converting...' : 'Conversion Error'}
+              </p>
+              {conversionStatus.message && (
+                <p className={`text-sm mt-1 ${
+                  conversionStatus.type === 'loading'
+                    ? 'text-blue-800 dark:text-blue-200'
+                    : 'text-red-800 dark:text-red-200'
+                }`}>
+                  {conversionStatus.message}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Pending Files */}
         {pendingFiles.length > 0 && (
