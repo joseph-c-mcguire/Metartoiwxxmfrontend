@@ -14,7 +14,7 @@ interface UserPreferencesDialogProps {
   onPreferencesSaved?: () => void;
 }
 
-type IWXXMVersion = "2.1" | "3.0" | "2023-1";
+type IWXXMVersion = "2025-2" | "2023-1";
 type OnErrorBehavior = "skip" | "fail" | "warn";
 type LogLevel = "DEBUG" | "INFO" | "WARNING" | "ERROR" | "CRITICAL";
 
@@ -65,7 +65,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   issuingCenter: 'KWBC',
   
   // IWXXM Settings
-  iwxxmVersion: '3.0',
+  iwxxmVersion: '2025-2',
   strictValidation: true,
   includeNilReasons: true,
   
@@ -363,9 +363,8 @@ export function UserPreferencesDialog({ isOpen, onClose, userEmail, onPreference
                     onChange={(e) => updatePreference('iwxxmVersion', e.target.value as IWXXMVersion)}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="2.1">2.1</option>
-                    <option value="3.0">3.0</option>
-                    <option value="2023-1">2023-1</option>
+                    <option value="2025-2">2025-2 (Latest)</option>
+                    <option value="2023-1">2023-1 (Previous)</option>
                   </select>
                 </div>
                 <div>

@@ -102,6 +102,8 @@ export async function checkHealth(): Promise<HealthResponse> {
 export async function convertMetarToIwxxm(params: {
   manualText?: string;
   files?: File[];
+  iwxxmVersion?: string;
+  validateOutput?: boolean;
   accessToken?: string;
 }): Promise<ConversionResponse> {
   const formData = new FormData();
@@ -115,6 +117,12 @@ export async function convertMetarToIwxxm(params: {
       formData.append('files', file);
     });
   }
+
+  // Add IWXXM version (default to 2025-2)
+  formData.append('iwxxm_version', params.iwxxmVersion || '2025-2');
+
+  // Add validation flag (default to false)
+  formData.append('validate_output', params.validateOutput ? 'true' : 'false');
 
   try {
     const token = params.accessToken || getAccessToken() || '';

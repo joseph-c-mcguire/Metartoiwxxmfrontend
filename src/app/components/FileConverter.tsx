@@ -36,7 +36,7 @@ interface FileConverterProps {
   onSwitchToAdmin?: () => void;
 }
 
-type IWXXMVersion = "2.1" | "3.0" | "2023-1";
+type IWXXMVersion = "2025-2" | "2023-1";
 type OnErrorBehavior = "skip" | "fail" | "warn";
 type LogLevel = "DEBUG" | "INFO" | "WARNING" | "ERROR" | "CRITICAL";
 
@@ -64,7 +64,7 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
   const [conversionParams, setConversionParams] = useState<ConversionParams>({
     bulletinId: '',
     issuingCenter: '',
-    iwxxmVersion: '3.0',
+    iwxxmVersion: '2025-2',
     strictValidation: true,
     includeNilReasons: true,
     onError: 'warn',
@@ -138,10 +138,19 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
         const stored = localStorage.getItem('metar_converter_preferences');
         if (stored) {
           const prefs = JSON.parse(stored);
+          // Migrate old version identifiers to new ones
+          let iwxxmVersion: IWXXMVersion = '2025-2';
+          if (prefs.iwxxmVersion === '2023-1') {
+            iwxxmVersion = '2023-1';
+          } else {
+            // Default any other version (3.0, 2.1, 2021-2) to 2025-2
+            iwxxmVersion = '2025-2';
+          }
+          
           setConversionParams({
             bulletinId: prefs.bulletinIdExample || 'SAAA00',
             issuingCenter: prefs.issuingCenter || 'KWBC',
-            iwxxmVersion: prefs.iwxxmVersion || '3.0',
+            iwxxmVersion,
             strictValidation: prefs.strictValidation ?? true,
             includeNilReasons: prefs.includeNilReasons ?? true,
             onError: prefs.onError || 'warn',
@@ -162,10 +171,19 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
       const stored = localStorage.getItem('metar_converter_preferences');
       if (stored) {
         const prefs = JSON.parse(stored);
+        // Migrate old version identifiers to new ones
+        let iwxxmVersion: IWXXMVersion = '2025-2';
+        if (prefs.iwxxmVersion === '2023-1') {
+          iwxxmVersion = '2023-1';
+        } else {
+          // Default any other version (3.0, 2.1, 2021-2) to 2025-2
+          iwxxmVersion = '2025-2';
+        }
+        
         setConversionParams({
           bulletinId: prefs.bulletinIdExample || 'SAAA00',
           issuingCenter: prefs.issuingCenter || 'KWBC',
-          iwxxmVersion: prefs.iwxxmVersion || '3.0',
+          iwxxmVersion,
           strictValidation: prefs.strictValidation ?? true,
           includeNilReasons: prefs.includeNilReasons ?? true,
           onError: prefs.onError || 'warn',
@@ -244,6 +262,8 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
       const response = await callBackendConversion({
         manualText: manualInput.trim() || undefined,
         files: filesToConvert.length > 0 ? filesToConvert : undefined,
+        iwxxmVersion: conversionParams.iwxxmVersion,
+        validateOutput: false,
         accessToken: accessToken,
       });
 
@@ -604,9 +624,8 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
                 onChange={(e) => setConversionParams(prev => ({ ...prev, iwxxmVersion: e.target.value as IWXXMVersion }))}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
               >
-                <option value="2.1">2.1</option>
-                <option value="3.0">3.0 (Default)</option>
-                <option value="2023-1">2023-1</option>
+                <option value="2025-2">2025-2 (Latest)</option>
+                <option value="2023-1">2023-1 (Previous)</option>
               </select>
             </div>
 

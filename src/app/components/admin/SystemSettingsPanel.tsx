@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { IcaoAutocomplete } from '../IcaoAutocomplete';
 import { projectId } from '/utils/supabase/info';
 
-type IWXXMVersion = "2.1" | "3.0" | "2023-1";
+type IWXXMVersion = "2025-2" | "2023-1";
 type OnErrorBehavior = "skip" | "fail" | "warn";
 type LogLevel = "DEBUG" | "INFO" | "WARNING" | "ERROR" | "CRITICAL";
 
@@ -31,7 +31,7 @@ export function SystemSettingsPanel({ accessToken }: SystemSettingsPanelProps) {
   const [settings, setSettings] = useState<SystemSettings>({
     defaultBulletinId: 'SAAA00',
     defaultIssuingCenter: 'KWBC',
-    defaultIwxxmVersion: '3.0',
+    defaultIwxxmVersion: '2025-2',
     defaultStrictValidation: true,
     defaultIncludeNilReasons: true,
     defaultOnError: 'warn',
@@ -215,9 +215,8 @@ export function SystemSettingsPanel({ accessToken }: SystemSettingsPanelProps) {
                 onChange={(e) => setSettings(prev => ({ ...prev, defaultIwxxmVersion: e.target.value as IWXXMVersion }))}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               >
-                <option value="2.1">2.1</option>
-                <option value="3.0">3.0</option>
-                <option value="2023-1">2023-1</option>
+                <option value="2025-2">2025-2 (Latest)</option>
+                <option value="2023-1">2023-1 (Previous)</option>
               </select>
             </div>
 
