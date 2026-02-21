@@ -34,6 +34,18 @@ function App() {
     }
 
     const supabaseUrl = getRequiredEnvVar('VITE_SUPABASE_URL');
+    const backendUrl = getRequiredEnvVar('VITE_BACKEND_URL');
+    const authServiceUrl = getRequiredEnvVar('VITE_AUTH_SERVICE_URL');
+
+    const withTimeout = (url: string, timeoutMs = 10000) => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+      return fetch(url, {
+        method: 'GET',
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeout));
+    };
+
     const healthResponse = await fetch(`${supabaseUrl}/auth/v1/settings`, {
       method: 'GET',
       headers: {
@@ -43,6 +55,20 @@ function App() {
 
     if (!healthResponse || !healthResponse.ok) {
       setPreflightError('Supabase connectivity check failed');
+      setPreflightDone(true);
+      return;
+    }
+
+    const backendHealthResponse = await withTimeout(`${backendUrl}/health`).catch(() => null);
+    if (!backendHealthResponse || !backendHealthResponse.ok) {
+      setPreflightError('Backend connectivity check failed');
+      setPreflightDone(true);
+      return;
+    }
+
+    const authHealthResponse = await withTimeout(`${authServiceUrl}/health`).catch(() => null);
+    if (!authHealthResponse || !authHealthResponse.ok) {
+      setPreflightError('Auth service connectivity check failed');
       setPreflightDone(true);
       return;
     }
