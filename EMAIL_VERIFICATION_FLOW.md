@@ -13,7 +13,7 @@ The email verification system now works seamlessly with **automatic session crea
 // Register.tsx - User fills out form
 await supabase.auth.signUp({
   email: 'user@example.com',
-  password: 'SecurePass123',
+  password: '<USER_PASSWORD>',
   options: {
     data: { username: 'john_doe' },
     emailRedirectTo: `${window.location.origin}/auth/callback`
@@ -262,8 +262,8 @@ Once approved, user can log in normally!
 ### **1. Register New User**
 ```bash
 Email: test@example.com
-Password: TestPass123
-Username: testuser
+Password: <TEST_ACCOUNT_PASSWORD>
+Username: example_user
 ```
 
 ### **2. Check Email**

@@ -140,9 +140,9 @@ https://yourdomain.com
 1. Go to registration page
 2. Fill in form:
    ```
-   Username: testuser456
+   Username: example_user
    Email: your-email@example.com
-   Password: test123456
+   Password: <TEST_ACCOUNT_PASSWORD>
    ```
 3. Click "Create Account"
 
@@ -185,7 +185,7 @@ https://yourdomain.com
 1. Go to: **Supabase** → **Table Editor** → **user_profiles**
 2. Find your user by email
 3. Verify the row exists with:
-   - `username`: testuser456
+   - `username`: example_user
    - `email`: your-email@example.com
    - `approval_status`: pending
    - `is_admin`: false
@@ -208,12 +208,12 @@ https://yourdomain.com
 3. Enter credentials:
    ```
    Email: your-email@example.com
-   Password: test123456
+   Password: <TEST_ACCOUNT_PASSWORD>
    ```
 4. Click "Sign In"
 
 **Expected:**
-- ✅ Toast: "Welcome back, testuser456!"
+- ✅ Toast: "Welcome back, example_user!"
 - ✅ Successfully logged in
 - ✅ Redirected to converter page
 - 🎉 **IT WORKS!**

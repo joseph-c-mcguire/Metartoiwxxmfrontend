@@ -38,10 +38,10 @@ Your app is now configured for **production email verification** with automatic 
 1. Click **"Create Account"** on register page
 2. Fill in:
    ```
-   Username: testuser123
+   Username: example_user
    Email: your-real-email@gmail.com
-   Password: TestPass123
-   Confirm Password: TestPass123
+   Password: <TEST_ACCOUNT_PASSWORD>
+   Confirm Password: <TEST_ACCOUNT_PASSWORD>
    ```
 3. Check terms checkbox
 4. Click **"Create Account"**

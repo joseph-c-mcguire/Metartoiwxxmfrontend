@@ -137,7 +137,7 @@ If you have your own email server:
 Host: smtp.yourserver.com
 Port: 587 (or 465 for SSL)
 Username: your-email@yourdomain.com
-Password: your-email-password
+Password: <SMTP_PASSWORD_OR_API_KEY>
 Sender email: noreply@yourdomain.com
 ```
 
@@ -150,8 +150,8 @@ After configuring, test it:
 ### **1. Register a Test User**
 ```bash
 Email: test@youremail.com
-Password: TestPass123
-Username: testuser
+Password: <TEST_ACCOUNT_PASSWORD>
+Username: example_user
 ```
 
 ### **2. Check Logs**

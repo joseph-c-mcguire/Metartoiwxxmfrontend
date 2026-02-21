@@ -78,7 +78,7 @@ You need to configure email settings in your **Supabase Dashboard**:
    SMTP Host: smtp.your-email-provider.com
    SMTP Port: 587 (or 465 for SSL)
    SMTP User: your-email@example.com
-   SMTP Password: your-email-password
+   SMTP Password: <SMTP_PASSWORD_OR_API_KEY>
    Sender Email: noreply@your-domain.com
    Sender Name: METAR Converter
    ```

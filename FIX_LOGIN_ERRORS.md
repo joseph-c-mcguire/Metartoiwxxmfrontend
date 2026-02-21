@@ -214,9 +214,9 @@ Now that the database is set up:
 2. Click "Sign up"
 3. Fill in registration form:
    ```
-   Username: testuser
+  Username: example_user
    Email: test@example.com
-   Password: test123456
+  Password: <TEST_ACCOUNT_PASSWORD>
    ```
 4. Click "Create Account"
 
@@ -231,7 +231,7 @@ Now that the database is set up:
 
 1. Go to Supabase → Table Editor → `user_profiles`
 2. You should see a new row with:
-   - `username`: testuser
+  - `username`: example_user
    - `email`: test@example.com
    - `approval_status`: pending
    - `is_admin`: false
@@ -276,7 +276,7 @@ Now that the database is set up:
 3. Click "Sign In"
 
 **Expected Result:**
-- ✅ Toast: "Welcome back, testuser!"
+- ✅ Toast: "Welcome back, example_user!"
 - ✅ Successfully logged in
 - ✅ Redirected to converter page
 - 🎉 **IT WORKS!**
