@@ -16,4 +16,7 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    allowedHosts: ['metar-to-iwxxm-frontend-v4-web.onrender.com'],
+  },
 })
