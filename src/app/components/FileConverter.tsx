@@ -12,6 +12,10 @@ import { DatabaseUploadDialog } from './DatabaseUploadDialog';
 import { UserPreferencesDialog } from './UserPreferencesDialog';
 import { IcaoAutocomplete } from './IcaoAutocomplete';
 import { projectId } from '/utils/supabase/info';
+import {
+  convertMetarToIwxxm as convertMetarToIwxxmApi,
+  ConversionApiError,
+} from '@/utils/api';
 
 interface ConvertedFile {
   id: string;
@@ -25,6 +29,7 @@ interface PendingFile {
   id: string;
   name: string;
   content: string;
+  file?: File;
 }
 
 interface FileConverterProps {
@@ -148,32 +153,6 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
     }
   };
 
-  // Mock conversion function - converts METAR to IWXXM XML
-  const convertMetarToIwxxm = (metarContent: string): string => {
-    const lines = metarContent.trim().split('\n').filter(line => line.trim());
-    let iwxxmXml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
-    iwxxmXml += `<IWXXM xmlns="http://icao.int/iwxxm/3.0">\n`;
-    
-    lines.forEach((line, index) => {
-      const parts = line.trim().split(/\s+/);
-      iwxxmXml += `  <MeteorologicalAerodromeObservation>\n`;
-      iwxxmXml += `    <observationTime>${new Date().toISOString()}</observationTime>\n`;
-      iwxxmXml += `    <content>${line}</content>\n`;
-      
-      if (parts.length > 0) {
-        iwxxmXml += `    <station>${parts[0]}</station>\n`;
-      }
-      if (parts.length > 1) {
-        iwxxmXml += `    <timestamp>${parts[1]} ${parts[2] || ''}</timestamp>\n`;
-      }
-      
-      iwxxmXml += `  </MeteorologicalAerodromeObservation>\n`;
-    });
-    
-    iwxxmXml += `</IWXXM>`;
-    return iwxxmXml;
-  };
-
   const handleFileSelect = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
@@ -187,6 +166,7 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
           id: `${file.name}-${Date.now()}-${i}`,
           name: file.name,
           content: content,
+          file,
         });
       } catch (error) {
         console.error(`Error reading file ${file.name}:`, error);
@@ -221,40 +201,67 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
 
     setIsConverting(true);
     
-    // Simulate conversion delay for better UX
-    await new Promise(resolve => setTimeout(resolve, 800));
+    try {
+      const queuedFiles = pendingFiles
+        .map((pendingFile) => pendingFile.file)
+        .filter((file): file is File => Boolean(file));
 
-    const newConvertedFiles: ConvertedFile[] = [];
-
-    // Convert pending files
-    pendingFiles.forEach(file => {
-      const converted = convertMetarToIwxxm(file.content);
-      newConvertedFiles.push({
-        id: `converted-${file.id}`,
-        originalName: file.name,
-        originalContent: file.content,
-        convertedContent: converted,
-        timestamp: Date.now(),
+      const response = await convertMetarToIwxxmApi({
+        manualText: manualInput,
+        files: queuedFiles,
+        iwxxmVersion: conversionParams.iwxxmVersion,
+        validateOutput: conversionParams.strictValidation,
+        accessToken,
       });
-    });
 
-    // Convert manual input if provided
-    if (manualInput.trim()) {
-      const converted = convertMetarToIwxxm(manualInput);
-      newConvertedFiles.push({
-        id: `manual-${Date.now()}`,
-        originalName: 'manual_input.txt',
-        originalContent: manualInput,
-        convertedContent: converted,
-        timestamp: Date.now(),
+      const sourceContentLookup = new Map<string, string>();
+      pendingFiles.forEach((pendingFile) => {
+        sourceContentLookup.set(pendingFile.name, pendingFile.content);
       });
+      if (manualInput.trim()) {
+        sourceContentLookup.set('manual_text', manualInput);
+      }
+
+      const newConvertedFiles: ConvertedFile[] = response.results.map((result, index) => {
+        const sourceName = result.source || result.name || `converted_${index + 1}.xml`;
+        return {
+          id: `converted-${Date.now()}-${index}`,
+          originalName: sourceName,
+          originalContent: sourceContentLookup.get(sourceName) || '',
+          convertedContent: result.content,
+          timestamp: Date.now(),
+        };
+      });
+
+      setConvertedFiles((prev) => [...newConvertedFiles, ...prev]);
+      setPendingFiles([]);
+      setManualInput('');
+
+      if (response.issues && response.issues.length > 0) {
+        const warningCount = response.issues.filter((issue) => issue.severity === 'warning').length;
+        const errorCount = response.issues.filter((issue) => issue.severity === 'error').length;
+        if (errorCount > 0) {
+          toast.error(`Conversion completed with ${errorCount} error issue(s)`);
+        } else if (warningCount > 0) {
+          toast.warning(`Conversion completed with ${warningCount} warning(s)`);
+        }
+      }
+
+      toast.success(`Successfully converted ${response.successful} file(s)`);
+    } catch (error) {
+      if (error instanceof ConversionApiError) {
+        const detailMessage = error.errors?.[0] || error.message;
+        toast.error('Backend conversion failed', {
+          description: detailMessage,
+        });
+      } else {
+        toast.error('Unable to reach backend conversion API', {
+          description: error instanceof Error ? error.message : 'Unknown conversion error',
+        });
+      }
+    } finally {
+      setIsConverting(false);
     }
-
-    setConvertedFiles(prev => [...newConvertedFiles, ...prev]);
-    setPendingFiles([]);
-    setManualInput('');
-    setIsConverting(false);
-    toast.success(`Successfully converted ${newConvertedFiles.length} file(s)`);
   };
 
   const handleDownloadSingle = (file: ConvertedFile) => {
