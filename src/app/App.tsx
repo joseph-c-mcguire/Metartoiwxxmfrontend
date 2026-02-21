@@ -9,7 +9,10 @@ import { Toaster } from "./components/ui/sonner";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { AccessibilityMenu } from "./components/AccessibilityMenu";
 import { AccessibilityProvider } from "./components/AccessibilityAnnouncement";
+import { Card } from './components/ui/card';
+import { Button } from './components/ui/button';
 import { supabase } from '/utils/supabase/client';
+import { getRequiredEnvVar, validateRequiredFrontendEnv } from '@/utils/env';
 
 type AuthView = 'login' | 'register' | 'verify' | 'converter' | 'admin' | 'callback';
 
@@ -19,10 +22,39 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [accessToken, setAccessToken] = useState<string>('');
   const [isAdmin, setIsAdmin] = useState(false);
+  const [preflightDone, setPreflightDone] = useState(false);
+  const [preflightError, setPreflightError] = useState<string>('');
+
+  const runPreflight = async () => {
+    const validation = validateRequiredFrontendEnv();
+    if (!validation.ok) {
+      setPreflightError(validation.errors.join('\n'));
+      setPreflightDone(true);
+      return;
+    }
+
+    const supabaseUrl = getRequiredEnvVar('VITE_SUPABASE_URL');
+    const healthResponse = await fetch(`${supabaseUrl}/auth/v1/settings`, {
+      method: 'GET',
+      headers: {
+        apikey: getRequiredEnvVar('VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY'),
+      },
+    }).catch(() => null);
+
+    if (!healthResponse || !healthResponse.ok) {
+      setPreflightError('Supabase connectivity check failed');
+      setPreflightDone(true);
+      return;
+    }
+
+    setPreflightError('');
+    setPreflightDone(true);
+  };
 
   // Set HTML lang attribute for screen readers
   useEffect(() => {
     document.documentElement.lang = 'en';
+    void runPreflight();
   }, []);
 
   // Listen for auth state changes (including email confirmation callbacks)
@@ -145,6 +177,48 @@ function App() {
   const handleSwitchToConverter = () => {
     setCurrentView('converter');
   };
+
+  if (!preflightDone) {
+    return (
+      <ThemeProvider>
+        <div className="min-h-screen bg-background flex items-center justify-center px-4 py-8">
+          <Card className="w-full max-w-md p-8 bg-card border-border">
+            <h2 className="text-lg font-semibold text-foreground mb-2 uppercase tracking-tight">
+              Starting Services
+            </h2>
+            <p className="text-sm text-muted-foreground font-mono">
+              Running connectivity checks...
+            </p>
+          </Card>
+        </div>
+      </ThemeProvider>
+    );
+  }
+
+  if (preflightError) {
+    return (
+      <ThemeProvider>
+        <div className="min-h-screen bg-background flex items-center justify-center px-4 py-8">
+          <Card className="w-full max-w-xl p-8 bg-card border-border">
+            <h2 className="text-lg font-semibold text-destructive mb-3 uppercase tracking-tight">
+              Service Preflight Failed
+            </h2>
+            <p className="text-sm text-muted-foreground font-mono whitespace-pre-wrap">
+              {preflightError}
+            </p>
+            <div className="mt-6">
+              <Button onClick={() => {
+                setPreflightDone(false);
+                void runPreflight();
+              }}>
+                Retry Checks
+              </Button>
+            </div>
+          </Card>
+        </div>
+      </ThemeProvider>
+    );
+  }
 
   return (
     <ThemeProvider>
