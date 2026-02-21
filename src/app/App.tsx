@@ -16,6 +16,15 @@ import { getRequiredEnvVar, validateRequiredFrontendEnv } from '@/utils/env';
 
 type AuthView = 'login' | 'register' | 'verify' | 'converter' | 'admin' | 'callback';
 
+type PreflightTelemetry = {
+  event: 'frontend_startup_preflight';
+  traceId: string;
+  deployMark: string;
+  status: 'success' | 'failure';
+  failedCheck?: 'env' | 'supabase' | 'backend' | 'auth';
+  timestamp: string;
+};
+
 function App() {
   const [currentView, setCurrentView] = useState<AuthView>('login');
   const [userEmail, setUserEmail] = useState('');
@@ -26,8 +35,26 @@ function App() {
   const [preflightError, setPreflightError] = useState<string>('');
 
   const runPreflight = async () => {
+    const traceId = `preflight-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    const deployMark = import.meta.env.VITE_FRONTEND_DEPLOY_MARK || 'unknown';
+
+    const emitPreflightTelemetry = (payload: Omit<PreflightTelemetry, 'event' | 'traceId' | 'deployMark' | 'timestamp'>) => {
+      const telemetry: PreflightTelemetry = {
+        event: 'frontend_startup_preflight',
+        traceId,
+        deployMark,
+        timestamp: new Date().toISOString(),
+        ...payload,
+      };
+      console.info('[frontend-telemetry]', JSON.stringify(telemetry));
+    };
+
     const validation = validateRequiredFrontendEnv();
     if (!validation.ok) {
+      emitPreflightTelemetry({
+        status: 'failure',
+        failedCheck: 'env',
+      });
       setPreflightError(validation.errors.join('\n'));
       setPreflightDone(true);
       return;
@@ -54,6 +81,10 @@ function App() {
     }).catch(() => null);
 
     if (!healthResponse || !healthResponse.ok) {
+      emitPreflightTelemetry({
+        status: 'failure',
+        failedCheck: 'supabase',
+      });
       setPreflightError('Supabase connectivity check failed');
       setPreflightDone(true);
       return;
@@ -61,6 +92,10 @@ function App() {
 
     const backendHealthResponse = await withTimeout(`${backendUrl}/health`).catch(() => null);
     if (!backendHealthResponse || !backendHealthResponse.ok) {
+      emitPreflightTelemetry({
+        status: 'failure',
+        failedCheck: 'backend',
+      });
       setPreflightError('Backend connectivity check failed');
       setPreflightDone(true);
       return;
@@ -68,11 +103,16 @@ function App() {
 
     const authHealthResponse = await withTimeout(`${authServiceUrl}/health`).catch(() => null);
     if (!authHealthResponse || !authHealthResponse.ok) {
+      emitPreflightTelemetry({
+        status: 'failure',
+        failedCheck: 'auth',
+      });
       setPreflightError('Auth service connectivity check failed');
       setPreflightDone(true);
       return;
     }
 
+    emitPreflightTelemetry({ status: 'success' });
     setPreflightError('');
     setPreflightDone(true);
   };
