@@ -14,7 +14,8 @@ import { Button } from './components/ui/button';
 import { supabase } from '/utils/supabase/client';
 import { getRequiredEnvVar, validateRequiredFrontendEnv } from '@/utils/env';
 
-type AuthView = 'login' | 'register' | 'verify' | 'converter' | 'admin' | 'callback';
+type AuthView = 'login' | 'register' | 'verify' | 'converter' | 'admin' | 'callback' | 'terms' | 'privacy';
+type LegalView = 'terms' | 'privacy';
 
 type PreflightTelemetry = {
   event: 'frontend_startup_preflight';
@@ -208,7 +209,7 @@ function App() {
       setCurrentView('verify');
     } else {
       setIsAuthenticated(true);
-      // Both admins and regular users start at the converter
+      // Admin dashboard is intentionally hidden for now.
       setCurrentView('converter');
     }
   };
@@ -222,8 +223,22 @@ function App() {
     setIsAuthenticated(true);
     setAccessToken(token || '');
     setIsAdmin(adminStatus || false);
-    setCurrentView(adminStatus ? 'admin' : 'converter');
+    setCurrentView('converter');
   };
+  const renderLegalPlaceholder = (view: LegalView) => (
+    <div className="min-h-screen bg-background flex items-center justify-center px-4 py-8">
+      <Card className="w-full max-w-xl p-8 bg-card border-border">
+        <h2 className="text-lg font-semibold text-foreground mb-3 uppercase tracking-tight">
+          {view === 'terms' ? 'Terms of Service' : 'Privacy Policy'}
+        </h2>
+        <p className="text-sm text-muted-foreground font-mono mb-6">
+          Placeholder page. Content coming soon.
+        </p>
+        <Button onClick={() => setCurrentView('login')}>Back to Login</Button>
+      </Card>
+    </div>
+  );
+
 
   const handleLogout = async () => {
     // Sign out from Supabase
@@ -234,10 +249,6 @@ function App() {
     setAccessToken('');
     setIsAdmin(false);
     setCurrentView('login');
-  };
-
-  const handleSwitchToAdmin = () => {
-    setCurrentView('admin');
   };
 
   const handleSwitchToConverter = () => {
@@ -300,7 +311,8 @@ function App() {
         {currentView === 'login' && (
           <Login 
             onLogin={handleLogin}
-            onSwitchToRegister={() => setCurrentView('register')}
+            onOpenTerms={() => setCurrentView('terms')}
+            onOpenPrivacy={() => setCurrentView('privacy')}
           />
         )}
 
@@ -308,6 +320,8 @@ function App() {
           <Register 
             onRegister={handleRegister}
             onSwitchToLogin={() => setCurrentView('login')}
+            onOpenTerms={() => setCurrentView('terms')}
+            onOpenPrivacy={() => setCurrentView('privacy')}
           />
         )}
 
@@ -324,7 +338,6 @@ function App() {
             onLogout={handleLogout} 
             userEmail={userEmail}
             accessToken={accessToken}
-            onSwitchToAdmin={isAdmin ? handleSwitchToAdmin : undefined}
           />
         )}
 
@@ -344,6 +357,9 @@ function App() {
             onVerified={handleVerified}
           />
         )}
+
+        {currentView === 'terms' && renderLegalPlaceholder('terms')}
+        {currentView === 'privacy' && renderLegalPlaceholder('privacy')}
       </main>
 
       <Toaster />

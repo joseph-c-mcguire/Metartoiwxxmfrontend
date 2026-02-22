@@ -19,4 +19,14 @@ export default defineConfig({
   server: {
     allowedHosts: ['metar-to-iwxxm-frontend-v4-web.onrender.com'],
   },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: './src/test/setup.ts',
+    exclude: ['tests/e2e/**', 'node_modules/**', 'dist/**'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+    },
+  },
 })

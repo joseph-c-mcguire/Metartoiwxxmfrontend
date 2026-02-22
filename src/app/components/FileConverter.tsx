@@ -4,14 +4,12 @@ import { Textarea } from './ui/textarea';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Upload, X, Download, Copy, FileText, Loader2, Database, Settings, ChevronDown, ChevronUp, Shield } from 'lucide-react';
+import { Upload, X, Download, Copy, FileText, Loader2, Settings, ChevronDown, ChevronUp } from 'lucide-react';
 import JSZip from 'jszip';
 import { toast } from 'sonner';
 import { ThemeToggle } from './ThemeToggle';
-import { DatabaseUploadDialog } from './DatabaseUploadDialog';
 import { UserPreferencesDialog } from './UserPreferencesDialog';
 import { IcaoAutocomplete } from './IcaoAutocomplete';
-import { projectId } from '/utils/supabase/info';
 import {
   convertMetarToIwxxm as convertMetarToIwxxmApi,
   ConversionApiError,
@@ -36,75 +34,37 @@ interface FileConverterProps {
   onLogout: () => void;
   userEmail: string;
   accessToken?: string;
-  onSwitchToAdmin?: () => void;
 }
 
-type IWXXMVersion = "2.1" | "3.0" | "2023-1";
-type OnErrorBehavior = "skip" | "fail" | "warn";
-type LogLevel = "DEBUG" | "INFO" | "WARNING" | "ERROR" | "CRITICAL";
+type IWXXMVersion = '2025-2' | '2023-1';
+type ValidationLevel = 'basic' | 'schema' | 'schematron' | 'icao_opmet' | 'comprehensive';
 
 interface ConversionParams {
   bulletinId: string;
   issuingCenter: string;
   iwxxmVersion: IWXXMVersion;
-  strictValidation: boolean;
-  includeNilReasons: boolean;
-  onError: OnErrorBehavior;
-  logLevel: LogLevel;
+  validateOutput: boolean;
+  validationLevel: ValidationLevel;
+  stopOnError: boolean;
 }
 
-export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmin }: FileConverterProps) {
+export function FileConverter({ onLogout, userEmail, accessToken }: FileConverterProps) {
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [convertedFiles, setConvertedFiles] = useState<ConvertedFile[]>([]);
   const [manualInput, setManualInput] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
-  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [isPreferencesDialogOpen, setIsPreferencesDialogOpen] = useState(false);
   const [isParamsExpanded, setIsParamsExpanded] = useState(false);
   const [conversionParams, setConversionParams] = useState<ConversionParams>({
     bulletinId: '',
     issuingCenter: '',
-    iwxxmVersion: '3.0',
-    strictValidation: true,
-    includeNilReasons: true,
-    onError: 'warn',
-    logLevel: 'INFO',
+    iwxxmVersion: '2025-2',
+    validateOutput: true,
+    validationLevel: 'comprehensive',
+    stopOnError: false,
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Check admin access and switch to admin view
-  const handleAdminAccess = async () => {
-    if (!onSwitchToAdmin) return;
-
-    try {
-      // Verify admin status with backend
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-2e3cda33/admin/stats`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-          },
-        }
-      );
-
-      if (response.ok) {
-        // User has admin access
-        onSwitchToAdmin();
-      } else if (response.status === 403) {
-        // User is authenticated but not an admin
-        toast.error('Sorry, you don\'t have permissions for that.', {
-          description: 'Admin access is required to view the dashboard.'
-        });
-      } else {
-        // Other error
-        toast.error('Unable to verify admin access');
-      }
-    } catch (error) {
-      console.error('Error checking admin access:', error);
-      toast.error('Failed to verify admin permissions');
-    }
-  };
 
   // Load user preferences on mount from localStorage
   useEffect(() => {
@@ -116,11 +76,10 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
           setConversionParams({
             bulletinId: prefs.bulletinIdExample || 'SAAA00',
             issuingCenter: prefs.issuingCenter || 'KWBC',
-            iwxxmVersion: prefs.iwxxmVersion || '3.0',
-            strictValidation: prefs.strictValidation ?? true,
-            includeNilReasons: prefs.includeNilReasons ?? true,
-            onError: prefs.onError || 'warn',
-            logLevel: prefs.logLevel || 'INFO',
+            iwxxmVersion: prefs.iwxxmVersion || '2025-2',
+            validateOutput: prefs.validateOutput ?? true,
+            validationLevel: prefs.validationLevel || 'comprehensive',
+            stopOnError: prefs.stopOnError ?? false,
           });
         }
       } catch (error) {
@@ -140,11 +99,10 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
         setConversionParams({
           bulletinId: prefs.bulletinIdExample || 'SAAA00',
           issuingCenter: prefs.issuingCenter || 'KWBC',
-          iwxxmVersion: prefs.iwxxmVersion || '3.0',
-          strictValidation: prefs.strictValidation ?? true,
-          includeNilReasons: prefs.includeNilReasons ?? true,
-          onError: prefs.onError || 'warn',
-          logLevel: prefs.logLevel || 'INFO',
+          iwxxmVersion: prefs.iwxxmVersion || '2025-2',
+          validateOutput: prefs.validateOutput ?? true,
+          validationLevel: prefs.validationLevel || 'comprehensive',
+          stopOnError: prefs.stopOnError ?? false,
         });
         toast.info('Conversion parameters updated from preferences');
       }
@@ -202,15 +160,24 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
     setIsConverting(true);
     
     try {
+      const manualEntries = manualInput
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean);
+
       const queuedFiles = pendingFiles
         .map((pendingFile) => pendingFile.file)
         .filter((file): file is File => Boolean(file));
 
       const response = await convertMetarToIwxxmApi({
-        manualText: manualInput,
+        manualText: manualEntries.join('\n'),
         files: queuedFiles,
         iwxxmVersion: conversionParams.iwxxmVersion,
-        validateOutput: conversionParams.strictValidation,
+        validateOutput: conversionParams.validateOutput,
+        validationLevel: conversionParams.validationLevel,
+        stopOnError: conversionParams.stopOnError,
+        bulletinId: conversionParams.bulletinId,
+        issuingCenter: conversionParams.issuingCenter,
         accessToken,
       });
 
@@ -218,8 +185,14 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
       pendingFiles.forEach((pendingFile) => {
         sourceContentLookup.set(pendingFile.name, pendingFile.content);
       });
-      if (manualInput.trim()) {
-        sourceContentLookup.set('manual_text', manualInput);
+      if (manualEntries.length === 1) {
+        sourceContentLookup.set('manual_input', manualEntries[0]);
+        sourceContentLookup.set('manual', manualEntries[0]);
+      }
+      if (manualEntries.length > 1) {
+        manualEntries.forEach((entry, index) => {
+          sourceContentLookup.set(`manual_input_${index + 1}`, entry);
+        });
       }
 
       const newConvertedFiles: ConvertedFile[] = response.results.map((result, index) => {
@@ -362,24 +335,6 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">METAR → IWXXM Converter</h1>
             <div className="flex items-center gap-3">
-              {onSwitchToAdmin && (
-                <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-purple-600 dark:text-purple-400" aria-hidden="true" />
-                  <select
-                    value="converter"
-                    onChange={(e) => {
-                      if (e.target.value === 'admin') {
-                        handleAdminAccess();
-                      }
-                    }}
-                    className="px-3 py-1.5 text-sm font-medium bg-purple-600 text-white border-0 rounded-md hover:bg-purple-700 dark:bg-purple-700 dark:hover:bg-purple-800 focus:ring-2 focus:ring-purple-500 focus:outline-none cursor-pointer"
-                    aria-label="Switch view"
-                  >
-                    <option value="converter" className="bg-white text-gray-900 dark:bg-gray-800 dark:text-white">File Converter</option>
-                    <option value="admin" className="bg-white text-gray-900 dark:bg-gray-800 dark:text-white">Admin Dashboard</option>
-                  </select>
-                </div>
-              )}
               <Button
                 onClick={() => setIsPreferencesDialogOpen(true)}
                 variant="outline"
@@ -523,41 +478,25 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
                 onChange={(e) => setConversionParams(prev => ({ ...prev, iwxxmVersion: e.target.value as IWXXMVersion }))}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
               >
-                <option value="2.1">2.1</option>
-                <option value="3.0">3.0 (Default)</option>
+                <option value="2025-2">2025-2 (Default)</option>
                 <option value="2023-1">2023-1</option>
               </select>
             </div>
 
-            {/* On Error */}
+            {/* Validation Level */}
             <div>
-              <Label htmlFor="param-on-error" className="dark:text-white mb-2">On Error Behavior</Label>
+              <Label htmlFor="param-validation-level" className="dark:text-white mb-2">Validation Level</Label>
               <select
-                id="param-on-error"
-                value={conversionParams.onError}
-                onChange={(e) => setConversionParams(prev => ({ ...prev, onError: e.target.value as OnErrorBehavior }))}
+                id="param-validation-level"
+                value={conversionParams.validationLevel}
+                onChange={(e) => setConversionParams(prev => ({ ...prev, validationLevel: e.target.value as ValidationLevel }))}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
               >
-                <option value="skip">Skip - Continue, skip invalid</option>
-                <option value="fail">Fail - Stop on first error</option>
-                <option value="warn">Warn - Continue with warnings</option>
-              </select>
-            </div>
-
-            {/* Log Level */}
-            <div>
-              <Label htmlFor="param-log-level" className="dark:text-white mb-2">Log Level</Label>
-              <select
-                id="param-log-level"
-                value={conversionParams.logLevel}
-                onChange={(e) => setConversionParams(prev => ({ ...prev, logLevel: e.target.value as LogLevel }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="DEBUG">DEBUG</option>
-                <option value="INFO">INFO (Default)</option>
-                <option value="WARNING">WARNING</option>
-                <option value="ERROR">ERROR</option>
-                <option value="CRITICAL">CRITICAL</option>
+                <option value="basic">Basic</option>
+                <option value="schema">Schema</option>
+                <option value="schematron">Schematron</option>
+                <option value="icao_opmet">ICAO OPMET</option>
+                <option value="comprehensive">Comprehensive</option>
               </select>
             </div>
 
@@ -567,23 +506,23 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
               <label className="flex items-center cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={conversionParams.strictValidation}
-                  onChange={(e) => setConversionParams(prev => ({ ...prev, strictValidation: e.target.checked }))}
+                  checked={conversionParams.validateOutput}
+                  onChange={(e) => setConversionParams(prev => ({ ...prev, validateOutput: e.target.checked }))}
                   className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                 />
                 <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                  Strict Validation
+                  Validate Output
                 </span>
               </label>
               <label className="flex items-center cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={conversionParams.includeNilReasons}
-                  onChange={(e) => setConversionParams(prev => ({ ...prev, includeNilReasons: e.target.checked }))}
+                  checked={conversionParams.stopOnError}
+                  onChange={(e) => setConversionParams(prev => ({ ...prev, stopOnError: e.target.checked }))}
                   className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                 />
                 <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                  Include Nil Reasons
+                  Stop on First Error
                 </span>
               </label>
             </div>
@@ -606,16 +545,6 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
             ) : (
               'Convert'
             )}
-          </Button>
-          <Button
-            onClick={() => setIsUploadDialogOpen(true)}
-            disabled={convertedFiles.length === 0}
-            variant="outline"
-            className="bg-green-600 text-white hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800 text-base disabled:opacity-50 disabled:cursor-not-allowed focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-            aria-label={`Upload ${convertedFiles.length} converted files to database`}
-          >
-            <Database className="w-4 h-4 mr-2" aria-hidden="true" />
-            Upload to Database {convertedFiles.length > 0 && `(${convertedFiles.length})`}
           </Button>
           <Button
             onClick={handleDownloadAll}
@@ -732,14 +661,6 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
           </p>
         </div>
       </div>
-
-      {/* Database Upload Dialog */}
-      <DatabaseUploadDialog
-        convertedFiles={convertedFiles}
-        isOpen={isUploadDialogOpen}
-        onClose={() => setIsUploadDialogOpen(false)}
-        accessToken={accessToken}
-      />
 
       {/* User Preferences Dialog */}
       <UserPreferencesDialog

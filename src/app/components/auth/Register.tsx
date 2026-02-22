@@ -7,7 +7,6 @@ import { Card } from '../ui/card';
 import { Mail, Lock, User, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ThemeToggle } from '../ThemeToggle';
-import { projectId, publicAnonKey } from '/utils/supabase/info';
 import { supabase } from '/utils/supabase/client';
 
 interface RegisterFormData {
@@ -20,9 +19,11 @@ interface RegisterFormData {
 interface RegisterProps {
   onRegister: (email: string) => void;
   onSwitchToLogin: () => void;
+  onOpenTerms: () => void;
+  onOpenPrivacy: () => void;
 }
 
-export function Register({ onRegister, onSwitchToLogin }: RegisterProps) {
+export function Register({ onRegister, onSwitchToLogin, onOpenTerms, onOpenPrivacy }: RegisterProps) {
   const [isLoading, setIsLoading] = useState(false);
   const { register, handleSubmit, watch, formState: { errors } } = useForm<RegisterFormData>();
   
@@ -232,11 +233,19 @@ export function Register({ onRegister, onSwitchToLogin }: RegisterProps) {
               />
               <label className="ml-2 text-sm text-gray-600 dark:text-gray-300">
                 I agree to the{' '}
-                <button type="button" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 focus:outline-none focus:underline">
+                <button
+                  type="button"
+                  onClick={onOpenTerms}
+                  className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 focus:outline-none focus:underline"
+                >
                   Terms of Service
                 </button>{' '}
                 and{' '}
-                <button type="button" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 focus:outline-none focus:underline">
+                <button
+                  type="button"
+                  onClick={onOpenPrivacy}
+                  className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 focus:outline-none focus:underline"
+                >
                   Privacy Policy
                 </button>
               </label>

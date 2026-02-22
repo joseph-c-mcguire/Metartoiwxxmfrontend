@@ -8,7 +8,6 @@ import { Mail, Lock, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ThemeToggle } from '../ThemeToggle';
 import { supabase } from '/utils/supabase/client';
-import { projectId, publicAnonKey } from '/utils/supabase/info';
 
 interface LoginFormData {
   emailOrUsername: string;
@@ -17,10 +16,11 @@ interface LoginFormData {
 
 interface LoginProps {
   onLogin: (email: string, needsVerification: boolean, token?: string, adminStatus?: boolean) => void;
-  onSwitchToRegister: () => void;
+  onOpenTerms: () => void;
+  onOpenPrivacy: () => void;
 }
 
-export function Login({ onLogin, onSwitchToRegister }: LoginProps) {
+export function Login({ onLogin, onOpenTerms, onOpenPrivacy }: LoginProps) {
   const [isLoading, setIsLoading] = useState(false);
   const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>();
 
@@ -255,23 +255,8 @@ export function Login({ onLogin, onSwitchToRegister }: LoginProps) {
             </Button>
           </form>
 
-          {/* Register Link */}
-          <div className="mt-6 pt-6 border-t border-border">
-            <p className="text-xs text-center text-muted-foreground">
-              No account?{' '}
-              <button
-                type="button"
-                onClick={onSwitchToRegister}
-                className="text-primary hover:text-primary/80 font-medium focus:outline-none focus:underline uppercase tracking-wide"
-                aria-label="Go to registration page"
-              >
-                Register
-              </button>
-            </p>
-          </div>
-
           {/* Admin Access Link */}
-          <div className="mt-2 text-center">
+          <div className="mt-6 pt-6 border-t border-border text-center">
             <p className="text-xs text-muted-foreground font-mono">
               <span className="text-secondary">ADMIN:</span> Login to access dashboard
             </p>
@@ -279,9 +264,23 @@ export function Login({ onLogin, onSwitchToRegister }: LoginProps) {
         </Card>
 
         {/* Footer */}
-        <p className="text-center text-xs text-muted-foreground mt-6 font-mono">
-          Terms of Service • Privacy Policy
-        </p>
+        <div className="text-center text-xs text-muted-foreground mt-6 font-mono flex items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={onOpenTerms}
+            className="hover:underline"
+          >
+            Terms of Service
+          </button>
+          <span>•</span>
+          <button
+            type="button"
+            onClick={onOpenPrivacy}
+            className="hover:underline"
+          >
+            Privacy Policy
+          </button>
+        </div>
       </div>
     </div>
   );

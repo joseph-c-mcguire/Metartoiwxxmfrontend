@@ -71,23 +71,23 @@ html {
    ============================================ */
 
 [data-high-contrast="true"] {
-  --background: #000000;
-  --foreground: #FFFFFF;
-  --card: #1A1A1A;
-  --card-foreground: #FFFFFF;
-  --primary: #FFFF00;
-  --primary-foreground: #000000;
-  --secondary: #00FFFF;
-  --secondary-foreground: #000000;
-  --muted: #333333;
-  --muted-foreground: #CCCCCC;
-  --accent: #FFFF00;
-  --accent-foreground: #000000;
-  --destructive: #FF0000;
-  --destructive-foreground: #FFFFFF;
-  --border: #FFFFFF;
-  --input: #FFFFFF;
-  --ring: #FFFF00;
+  --background: #ffffff;
+  --foreground: #000000;
+  --card: #ffffff;
+  --card-foreground: #000000;
+  --primary: #000000;
+  --primary-foreground: #ffffff;
+  --secondary: #00008b;
+  --secondary-foreground: #ffffff;
+  --muted: #f5f5f5;
+  --muted-foreground: #111111;
+  --accent: #00008b;
+  --accent-foreground: #ffffff;
+  --destructive: #8b0000;
+  --destructive-foreground: #ffffff;
+  --border: #000000;
+  --input: #ffffff;
+  --ring: #000000;
 }
 
 [data-high-contrast="true"] * {
@@ -104,7 +104,7 @@ html {
 }
 
 [data-high-contrast="true"] :focus {
-  outline: 3px solid #FFFF00 !important;
+  outline: 3px solid #000000 !important;
   outline-offset: 2px !important;
 }
 
@@ -304,24 +304,6 @@ kbd {
 }
 
 /* ============================================
-   TOOLTIPS & ARIA LABELS
-   ============================================ */
-
-[aria-label]:hover::after,
-[data-tooltip]:hover::after {
-  content: attr(aria-label);
-  position: absolute;
-  background: var(--popover);
-  color: var(--popover-foreground);
-  border: 1px solid var(--border);
-  padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
-  white-space: nowrap;
-  z-index: 1000;
-  pointer-events: none;
-}
-
-/* ============================================
    ERROR & WARNING STATES
    ============================================ */
 
@@ -391,7 +373,22 @@ kbd {
   --card-foreground: #FFFFFF;
   --primary: #FFFF00;
   --primary-foreground: #000000;
+  --secondary: #00ffff;
+  --secondary-foreground: #000000;
+  --muted: #1a1a1a;
+  --muted-foreground: #f5f5f5;
+  --accent: #ffff00;
+  --accent-foreground: #000000;
+  --destructive: #ff3b3b;
+  --destructive-foreground: #ffffff;
   --border: #FFFFFF;
+  --input: #000000;
+  --ring: #ffff00;
+}
+
+.dark[data-high-contrast="true"] :focus {
+  outline: 3px solid #ffff00 !important;
+  outline-offset: 2px !important;
 }
 
 /* ============================================
@@ -435,6 +432,10 @@ kbd {
   height: 12px;
 }
 
+html {
+  scrollbar-gutter: stable;
+}
+
 ::-webkit-scrollbar-track {
   background: var(--muted);
 }
@@ -446,10 +447,10 @@ kbd {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--foreground);
+  background: var(--muted-foreground);
 }
 
 [data-high-contrast="true"] ::-webkit-scrollbar-thumb {
-  background: #FFFF00;
-  border: 2px solid #000000;
+  background: var(--foreground);
+  border: 2px solid var(--background);
 }

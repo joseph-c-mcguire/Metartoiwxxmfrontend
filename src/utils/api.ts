@@ -46,6 +46,12 @@ export interface ConversionResponse {
   total_processed: number;
   successful: number;
   failed: number;
+  metadata?: {
+    bulletin_id?: string | null;
+    issuing_center?: string | null;
+    validation_level?: string;
+    stop_on_error?: boolean;
+  };
 }
 
 export interface HealthResponse {
@@ -132,6 +138,10 @@ export async function convertMetarToIwxxm(params: {
   files?: File[];
   iwxxmVersion?: string;
   validateOutput?: boolean;
+  validationLevel?: 'basic' | 'schema' | 'schematron' | 'icao_opmet' | 'comprehensive';
+  stopOnError?: boolean;
+  bulletinId?: string;
+  issuingCenter?: string;
   accessToken?: string;
 }): Promise<ConversionResponse> {
   const formData = new FormData();
@@ -152,6 +162,16 @@ export async function convertMetarToIwxxm(params: {
 
   // Add validation flag (default to false)
   formData.append('validate_output', params.validateOutput ? 'true' : 'false');
+  formData.append('validation_level', params.validationLevel || 'basic');
+  formData.append('stop_on_error', params.stopOnError ? 'true' : 'false');
+
+  if (params.bulletinId?.trim()) {
+    formData.append('bulletin_id', params.bulletinId.trim().toUpperCase());
+  }
+
+  if (params.issuingCenter?.trim()) {
+    formData.append('issuing_center', params.issuingCenter.trim().toUpperCase());
+  }
 
   try {
     const token = params.accessToken || getAccessToken() || '';
@@ -166,6 +186,10 @@ export async function convertMetarToIwxxm(params: {
       fileCount: params.files?.length || 0,
       iwxxmVersion: params.iwxxmVersion || '2025-2',
       validateOutput: Boolean(params.validateOutput),
+      validationLevel: params.validationLevel || 'basic',
+      stopOnError: Boolean(params.stopOnError),
+      bulletinId: params.bulletinId?.trim().toUpperCase() || null,
+      issuingCenter: params.issuingCenter?.trim().toUpperCase() || null,
     });
 
     const response = await withTimeout(

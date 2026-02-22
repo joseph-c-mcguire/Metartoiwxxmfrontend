@@ -1,6 +1,9 @@
 const REQUIRED_ENV = [
   'VITE_SUPABASE_URL',
   'VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY',
+  'VITE_BACKEND_URL',
+  'VITE_AUTH_SERVICE_URL',
+  'VITE_APP_URL',
 ] as const;
 
 export type RequiredEnvKey = (typeof REQUIRED_ENV)[number];

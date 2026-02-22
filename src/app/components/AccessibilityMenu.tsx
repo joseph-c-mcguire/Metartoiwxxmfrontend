@@ -93,7 +93,6 @@ export function AccessibilityMenu() {
         onClick={() => setIsOpen(true)}
         className="fixed bottom-4 right-4 z-50 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-all flex items-center justify-center border border-primary-foreground/20"
         aria-label="Open accessibility settings menu. Press Alt plus A to open anytime."
-        title="Accessibility Settings (Alt+A)"
       >
         <Settings className="w-6 h-6" aria-hidden="true" />
         <span className="sr-only">Accessibility Settings</span>
