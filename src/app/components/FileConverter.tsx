@@ -14,6 +14,7 @@ import {
   convertMetarToIwxxm as convertMetarToIwxxmApi,
   ConversionApiError,
 } from '@/utils/api';
+import { prettifyXml } from '@/utils/xml';
 
 interface ConvertedFile {
   id: string;
@@ -313,6 +314,27 @@ export function FileConverter({ onLogout, userEmail, accessToken }: FileConverte
     }
   };
 
+  const handlePrettify = (id: string) => {
+    const targetFile = convertedFiles.find((file) => file.id === id);
+    if (!targetFile) {
+      return;
+    }
+
+    try {
+      const prettifiedContent = prettifyXml(targetFile.convertedContent);
+      setConvertedFiles((prev) => prev.map((file) => (
+        file.id === id
+          ? { ...file, convertedContent: prettifiedContent }
+          : file
+      )));
+      toast.success(`${targetFile.originalName} prettified`);
+    } catch {
+      toast.error(`Unable to prettify ${targetFile.originalName}`, {
+        description: 'The XML appears to be invalid or malformed.',
+      });
+    }
+  };
+
   const removePendingFile = (id: string) => {
     setPendingFiles(prev => prev.filter(f => f.id !== id));
   };
@@ -323,8 +345,9 @@ export function FileConverter({ onLogout, userEmail, accessToken }: FileConverte
 
   const handleClear = () => {
     setPendingFiles([]);
+    setConvertedFiles([]);
     setManualInput('');
-    toast.info('Queue cleared');
+    toast.info('Queue and history cleared');
   };
 
   return (
@@ -361,6 +384,34 @@ export function FileConverter({ onLogout, userEmail, accessToken }: FileConverte
           </div>
           <p className="text-base text-gray-600 dark:text-gray-300">
             Drag & drop one or more METAR TAC files, or type a METAR manually below. Click Convert to produce IWXXM XML (downloadable as XML).
+          </p>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+            API docs:{' '}
+            <a
+              href="https://metar-to-iwxxm-api.onrender.com/docs"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Swagger UI
+            </a>
+            {' '}• For feedback or bug reports, add to{' '}
+            <a
+              href="https://github.com/joseph-c-mcguire/metar-to-IWXXM/issues"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              GitHub
+            </a>
+            {' '}or contact{' '}
+            <a
+              href="mailto:Joseph.c.mcg@gmail.com"
+              className="text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Joseph.c.mcg@gmail.com
+            </a>
+            .
           </p>
         </div>
 
@@ -621,6 +672,15 @@ export function FileConverter({ onLogout, userEmail, accessToken }: FileConverte
                       <Button
                         variant="outline"
                         size="sm"
+                        onClick={() => handlePrettify(file.id)}
+                        className="bg-gray-600 text-white hover:bg-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 text-sm border-0 focus:ring-2 focus:ring-gray-500"
+                        aria-label={`Prettify ${file.originalName} XML`}
+                      >
+                        Prettify
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => handleCopy(file.convertedContent)}
                         className="bg-blue-500 text-white hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-sm border-0 focus:ring-2 focus:ring-blue-500"
                         aria-label={`Copy ${file.originalName} content to clipboard`}
@@ -657,7 +717,7 @@ export function FileConverter({ onLogout, userEmail, accessToken }: FileConverte
         {/* Footer */}
         <div className="mt-12 text-center text-sm text-gray-500 dark:text-gray-400">
           <p>
-            Conversion powered by GIFS library Outputs.java raw IWXXM XML serialized to .txt for convenience.
+            Conversion powered by GIFTs library. Outputs raw IWXXM XML serialized to .txt for convenience.
           </p>
         </div>
       </div>

@@ -281,6 +281,31 @@ export function Login({ onLogin, onOpenTerms, onOpenPrivacy }: LoginProps) {
             Privacy Policy
           </button>
         </div>
+
+        <div className="text-center text-xs text-muted-foreground mt-3 font-mono">
+          API docs:{' '}
+          <a
+            href="https://metar-to-iwxxm-api.onrender.com/docs"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:underline"
+          >
+            Swagger UI
+          </a>
+          {' '}• Feedback/bugs:{' '}
+          <a
+            href="https://github.com/joseph-c-mcguire/metar-to-IWXXM/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:underline"
+          >
+            GitHub
+          </a>
+          {' '}or{' '}
+          <a href="mailto:Joseph.c.mcg@gmail.com" className="hover:underline">
+            Joseph.c.mcg@gmail.com
+          </a>
+        </div>
       </div>
     </div>
   );
