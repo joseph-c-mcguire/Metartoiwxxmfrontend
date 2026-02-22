@@ -13,6 +13,7 @@ import { IcaoAutocomplete } from './IcaoAutocomplete';
 import {
   convertMetarToIwxxm as convertMetarToIwxxmApi,
   ConversionApiError,
+  type ConversionIssue,
 } from '@/utils/api';
 import { prettifyXml } from '@/utils/xml';
 
@@ -52,6 +53,9 @@ interface ConversionParams {
 export function FileConverter({ onLogout, userEmail, accessToken }: FileConverterProps) {
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [convertedFiles, setConvertedFiles] = useState<ConvertedFile[]>([]);
+  const [lastConversionErrors, setLastConversionErrors] = useState<string[]>([]);
+  const [lastConversionIssues, setLastConversionIssues] = useState<ConversionIssue[]>([]);
+  const [lastConversionStatus, setLastConversionStatus] = useState<number | null>(null);
   const [manualInput, setManualInput] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
@@ -159,6 +163,9 @@ export function FileConverter({ onLogout, userEmail, accessToken }: FileConverte
     }
 
     setIsConverting(true);
+    setLastConversionErrors([]);
+    setLastConversionIssues([]);
+    setLastConversionStatus(null);
     
     try {
       const manualEntries = manualInput
@@ -210,6 +217,8 @@ export function FileConverter({ onLogout, userEmail, accessToken }: FileConverte
       setConvertedFiles((prev) => [...newConvertedFiles, ...prev]);
       setPendingFiles([]);
       setManualInput('');
+      setLastConversionErrors(response.errors || []);
+      setLastConversionIssues(response.issues || []);
 
       if (response.issues && response.issues.length > 0) {
         const warningCount = response.issues.filter((issue) => issue.severity === 'warning').length;
@@ -225,10 +234,17 @@ export function FileConverter({ onLogout, userEmail, accessToken }: FileConverte
     } catch (error) {
       if (error instanceof ConversionApiError) {
         const detailMessage = error.errors?.[0] || error.message;
+        setLastConversionStatus(error.status ?? null);
+        setLastConversionErrors(error.errors?.length ? error.errors : [detailMessage]);
+        setLastConversionIssues(error.issues || []);
         toast.error('Backend conversion failed', {
           description: detailMessage,
         });
       } else {
+        setLastConversionErrors([
+          error instanceof Error ? error.message : 'Unknown conversion error',
+        ]);
+        setLastConversionIssues([]);
         toast.error('Unable to reach backend conversion API', {
           description: error instanceof Error ? error.message : 'Unknown conversion error',
         });
@@ -615,6 +631,65 @@ export function FileConverter({ onLogout, userEmail, accessToken }: FileConverte
             Clear
           </Button>
         </div>
+
+        {(lastConversionErrors.length > 0 || lastConversionIssues.length > 0) && (
+          <Card
+            className="mb-8 p-5 bg-white dark:bg-gray-800 dark:border-gray-700"
+            role="region"
+            aria-label="Validation and conversion issues"
+          >
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+              Validation and Conversion Issues
+            </h2>
+            {lastConversionStatus && (
+              <p className="text-sm text-red-700 dark:text-red-300 mb-2">
+                HTTP status: {lastConversionStatus}
+              </p>
+            )}
+
+            {lastConversionErrors.length > 0 && (
+              <div className="mb-4">
+                <p className="text-sm font-medium text-gray-900 dark:text-white mb-2">
+                  Errors
+                </p>
+                <ul className="list-disc pl-5 space-y-1 text-sm text-red-700 dark:text-red-300">
+                  {lastConversionErrors.map((errorMessage, index) => (
+                    <li key={`error-${index}`}>{errorMessage}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {lastConversionIssues.length > 0 && (
+              <div>
+                <p className="text-sm font-medium text-gray-900 dark:text-white mb-2">
+                  Validation details
+                </p>
+                <ul className="space-y-2">
+                  {lastConversionIssues.map((issue, index) => (
+                    <li
+                      key={`issue-${index}`}
+                      className="text-sm border border-gray-200 dark:border-gray-700 rounded p-2"
+                    >
+                      <p className="text-gray-900 dark:text-gray-100">
+                        <span className="font-medium">{issue.source || 'Input'}</span>: {issue.message}
+                      </p>
+                      {(issue.layer || issue.code || issue.hint) && (
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                          {issue.layer ? `Layer: ${issue.layer}` : ''}
+                          {issue.layer && issue.code ? ' • ' : ''}
+                          {issue.code ? `Code: ${issue.code}` : ''}
+                          {(issue.layer || issue.code) && issue.hint ? ' • ' : ''}
+                          {issue.hint ? `Hint: ${issue.hint}` : ''}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </Card>
+        )}
 
         {/* Pending Files */}
         {pendingFiles.length > 0 && (

@@ -39,6 +39,16 @@ export interface ConversionIssue {
   location?: string;
 }
 
+export interface ConversionMetadata {
+  bulletin_id?: string | null;
+  issuing_center?: string | null;
+  validation_level?: string;
+  stop_on_error?: boolean;
+  validate_output?: boolean;
+  iwxxm_version?: string;
+  [key: string]: unknown;
+}
+
 export interface ConversionResponse {
   results: ConversionResult[];
   errors: string[];
@@ -46,25 +56,26 @@ export interface ConversionResponse {
   total_processed: number;
   successful: number;
   failed: number;
-  metadata?: {
-    bulletin_id?: string | null;
-    issuing_center?: string | null;
-    validation_level?: string;
-    stop_on_error?: boolean;
-  };
+  metadata?: ConversionMetadata;
 }
 
 export interface HealthResponse {
-  status: 'healthy' | 'degraded';
+  status: string;
   version: string;
   gifts_available: boolean;
+  timestamp: string;
+  service: string;
 }
 
 export interface ApiError {
   message: string;
   errors: string[];
-  issues?: ConversionIssue[];
-  total_errors?: number;
+  issues: ConversionIssue[];
+  total_errors: number;
+}
+
+export interface ApiErrorResponse {
+  detail: ApiError;
 }
 
 export class ConversionApiError extends Error {
@@ -218,16 +229,19 @@ export async function convertMetarToIwxxm(params: {
         errorText = jsonFallback ? JSON.stringify(jsonFallback) : '';
       }
 
-      let error: any = {
+      let error: ApiErrorResponse | ApiError = {
         message: `Conversion failed: ${response.statusText}`,
         errors: [],
         issues: [],
+        total_errors: 0,
       };
       try {
-        error = errorText ? JSON.parse(errorText) : error;
+        error = errorText ? JSON.parse(errorText) as ApiErrorResponse | ApiError : error;
       } catch {
         // Keep fallback error shape
       }
+
+      const detail = 'detail' in error ? error.detail : error;
 
       console.error('[API][CONVERT] Non-2xx response', {
         status: response.status,
@@ -237,9 +251,9 @@ export async function convertMetarToIwxxm(params: {
       });
 
       throw new ConversionApiError(
-        error.detail?.message || error.message || `HTTP ${response.status}`,
-        error.detail?.errors || error.errors || [],
-        error.detail?.issues || error.issues || [],
+        detail.message || `HTTP ${response.status}`,
+        detail.errors || [],
+        detail.issues || [],
         response.status
       );
     }
