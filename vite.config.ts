@@ -26,7 +26,17 @@ export default defineConfig({
     exclude: ['tests/e2e/**', 'node_modules/**', 'dist/**'],
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html'],
+      reporter: ['text', 'json', 'html', 'lcov'],
+      include: [
+        'src/app/components/FileConverter.tsx',
+        'src/app/components/ThemeToggle.tsx',
+        'src/app/components/ui/button.tsx',
+        'src/app/components/ui/input.tsx',
+        'src/app/components/ui/label.tsx',
+        'src/app/components/ui/textarea.tsx',
+        'src/app/components/ui/utils.ts',
+        'src/utils/xml.ts',
+      ],
     },
   },
 })
