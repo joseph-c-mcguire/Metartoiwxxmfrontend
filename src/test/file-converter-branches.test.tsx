@@ -126,6 +126,11 @@ describe('FileConverter uncovered branches', () => {
   it('handles file read failures and shows an error toast', async () => {
     render(<FileConverter onLogout={vi.fn()} userEmail="test@example.com" accessToken="token" />);
 
+    expect(screen.getByLabelText('Select METAR files to upload')).toHaveAttribute(
+      'accept',
+      '.txt,.metar,.tac,.xml',
+    );
+
     const unreadable = new File(['ignored'], 'broken.metar', { type: 'text/plain' });
     Object.defineProperty(unreadable, 'text', {
       value: vi.fn().mockRejectedValue(new Error('boom')),

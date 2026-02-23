@@ -259,7 +259,7 @@ export function FileConverter({ onLogout, userEmail, accessToken }: FileConverte
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = file.originalName.replace(/\.(txt|metar)$/i, '.xml');
+    a.download = file.originalName.replace(/\.(txt|metar|tac)$/i, '.xml');
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -273,7 +273,7 @@ export function FileConverter({ onLogout, userEmail, accessToken }: FileConverte
     const zip = new JSZip();
     
     convertedFiles.forEach(file => {
-      const filename = file.originalName.replace(/\.(txt|metar)$/i, '.xml');
+      const filename = file.originalName.replace(/\.(txt|metar|tac)$/i, '.xml');
       zip.file(filename, file.convertedContent);
     });
 
@@ -459,7 +459,7 @@ export function FileConverter({ onLogout, userEmail, accessToken }: FileConverte
               ref={fileInputRef}
               type="file"
               multiple
-              accept=".txt,.metar"
+              accept=".txt,.metar,.tac,.xml"
               className="hidden"
               onChange={(e) => handleFileSelect(e.target.files)}
               aria-label="Select METAR files to upload"
