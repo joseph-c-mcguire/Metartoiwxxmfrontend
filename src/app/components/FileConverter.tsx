@@ -116,7 +116,7 @@ export function FileConverter({ onLogout, userEmail, accessToken }: FileConverte
     }
   };
 
-  const handleFileSelect = async (files: FileList | null) => {
+  const handleFileSelect = async (files: File[]) => {
     if (!files || files.length === 0) return;
 
     const newPendingFiles: PendingFile[] = [];
@@ -143,16 +143,26 @@ export function FileConverter({ onLogout, userEmail, accessToken }: FileConverte
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragging(false);
-    handleFileSelect(e.dataTransfer.files);
+    handleFileSelect(Array.from(e.dataTransfer.files ?? []));
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragging(true);
   };
 
-  const handleDragLeave = () => {
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     setIsDragging(false);
   };
 
@@ -439,6 +449,7 @@ export function FileConverter({ onLogout, userEmail, accessToken }: FileConverte
               : 'border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-800'
           }`}
           onDrop={handleDrop}
+          onDragEnter={handleDragEnter}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           role="button"
@@ -461,7 +472,7 @@ export function FileConverter({ onLogout, userEmail, accessToken }: FileConverte
               multiple
               accept=".txt,.metar,.tac,.xml"
               className="hidden"
-              onChange={(e) => handleFileSelect(e.target.files)}
+              onChange={(e) => handleFileSelect(Array.from(e.target.files ?? []))}
               aria-label="Select METAR files to upload"
             />
             <Button

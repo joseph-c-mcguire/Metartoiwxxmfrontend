@@ -203,6 +203,49 @@ describe('FileConverter uncovered branches', () => {
     });
   });
 
+  it('handles dropping multiple files and submits both', async () => {
+    convertMock.mockResolvedValueOnce({
+      results: [],
+      errors: [],
+      issues: [],
+      total_processed: 2,
+      successful: 2,
+      failed: 0,
+    });
+
+    render(<FileConverter onLogout={vi.fn()} userEmail="test@example.com" accessToken="token" />);
+
+    const droppedA = new File(['METAR KSFO 161200Z 30010KT 10SM CLR 15/08 A3012'], 'drop-a.metar', {
+      type: 'text/plain',
+    });
+    Object.defineProperty(droppedA, 'text', {
+      value: vi.fn().mockResolvedValue('METAR KSFO 161200Z 30010KT 10SM CLR 15/08 A3012'),
+    });
+
+    const droppedB = new File(['METAR KSEA 161200Z 20008KT 10SM FEW020 11/07 A3001'], 'drop-b.tac', {
+      type: 'text/plain',
+    });
+    Object.defineProperty(droppedB, 'text', {
+      value: vi.fn().mockResolvedValue('METAR KSEA 161200Z 20008KT 10SM FEW020 11/07 A3001'),
+    });
+
+    const dropZone = screen.getByRole('button', { name: /file drop zone/i });
+    fireEvent.drop(dropZone, {
+      dataTransfer: { files: [droppedA, droppedB] },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('drop-a.metar')).toBeInTheDocument();
+      expect(screen.getByText('drop-b.tac')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /convert metar files to iwxxm xml/i }));
+
+    await waitFor(() => {
+      expect(convertMock).toHaveBeenCalledWith(expect.objectContaining({ files: [droppedA, droppedB] }));
+    });
+  });
+
   it('handles warning-only issues and generic conversion exceptions', async () => {
     convertMock.mockResolvedValueOnce({
       results: [],
