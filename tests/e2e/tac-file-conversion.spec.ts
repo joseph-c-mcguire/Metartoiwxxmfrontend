@@ -30,39 +30,42 @@ test.describe('TAC File Conversion', () => {
     });
   });
 
+  const loginAndOpenConverter = async (page) => {
+    console.log('Step 1: Logging in...');
+    await page.getByRole('textbox', { name: /email address/i }).fill('admin@metar.local');
+    await page.getByRole('textbox', { name: /password/i }).fill('Admin123456!');
+    await page.getByRole('button', { name: /sign in to account/i }).click();
+
+    console.log('Step 2: Ensuring File Converter view...');
+    const converterNavButton = page.getByRole('button', { name: /file converter/i }).first();
+    if (await converterNavButton.isVisible().catch(() => false)) {
+      await converterNavButton.click();
+      await page.waitForTimeout(1000);
+    }
+
+    await page.getByText(/METAR.*IWXXM.*Converter/i).waitFor({ state: 'visible', timeout: 10000 });
+  };
+
   test('TAC file content can be converted to IWXXM XML', async ({ page }) => {
     console.log('🧪 Testing: TAC file conversion via manual input');
     console.log('=====================================');
 
-    // Step 1: Login with valid credentials
-    console.log('Step 1: Logging in...');
-    await page.getByPlaceholder(/email/i).fill('admin@metar.local');
-    await page.getByPlaceholder(/password/i).fill('Admin123456!');
-    await page.getByRole('button', { name: /sign in|login/i }).click();
-    
-    // Navigate to File Converter (admin users start on admin dashboard)
-    console.log('Step 2: Navigating to File Converter...');
-    await page.getByRole('button', { name: /file converter/i }).click();
-    await page.waitForTimeout(1000);
-    
-    // Wait for converter to load
-    console.log('Step 3: Waiting for converter to load...');
-    await page.getByText(/METAR.*IWXXM.*Converter/i).waitFor({ state: 'visible', timeout: 10000 });
+    await loginAndOpenConverter(page);
     
     // Verify we're on the File Converter view
-    console.log('Step 4: Verifying File Converter view...');
+    console.log('Step 3: Verifying File Converter view...');
     const converterHeading = page.getByText(/METAR.*IWXXM.*Converter/i);
     const isConverterVisible = await converterHeading.isVisible().catch(() => false);
     console.log(`✓ File Converter visible: ${isConverterVisible}`);
     expect(isConverterVisible).toBe(true);
 
     // Find and fill the input textarea
-    console.log('Step 5: Finding and filling input textarea...');
+    console.log('Step 4: Finding and filling input textarea...');
     const inputTextarea = page.locator('textarea').first();
     await inputTextarea.waitFor({ state: 'attached', timeout: 5000 });
 
     // Paste the TAC file content
-    console.log(`Step 6: Pasting TAC content: "${tacFileContent}"`);
+    console.log(`Step 5: Pasting TAC content: "${tacFileContent}"`);
     await inputTextarea.fill(tacFileContent);
     
     // Verify content was entered
@@ -72,22 +75,22 @@ test.describe('TAC File Conversion', () => {
     expect(enteredContent).toContain('282350Z');
 
     // Find and click the Convert button
-    console.log('Step 7: Looking for Convert button...');
+    console.log('Step 6: Looking for Convert button...');
     const convertButton = page.locator('button[aria-label*="Convert"]').first();
     const buttonVisible = await convertButton.isVisible().catch(() => false);
     console.log(`✓ Convert button visible: ${buttonVisible}`);
     expect(buttonVisible).toBe(true);
 
     // Click the Convert button
-    console.log('Step 8: Clicking Convert button...');
+    console.log('Step 7: Clicking Convert button...');
     await convertButton.click();
     
     // Wait for conversion to process
-    console.log('Step 9: Waiting for conversion to complete...');
+    console.log('Step 8: Waiting for conversion to complete...');
     await page.waitForTimeout(4000);
 
     // Look for the Results section
-    console.log('Step 10: Checking for Results section...');
+    console.log('Step 9: Checking for Results section...');
     const resultsHeading = page.getByText(/Results/i);
     const resultsVisible = await resultsHeading.isVisible().catch(() => false);
     console.log(`✓ Results section visible: ${resultsVisible}`);
@@ -130,7 +133,7 @@ test.describe('TAC File Conversion', () => {
     }
 
     // Find the converted XML output in pre tags
-    console.log('Step 11: Locating converted XML output...');
+    console.log('Step 10: Locating converted XML output...');
     const xmlOutputPre = page.locator('pre');
     const preCount = await xmlOutputPre.count();
     console.log(`Found ${preCount} pre elements on page`);
@@ -187,7 +190,7 @@ test.describe('TAC File Conversion', () => {
 
     // Verify XML structure
     if (conversionSuccessful && xmlContent) {
-      console.log('Step 12: Validating XML structure...');
+      console.log('Step 11: Validating XML structure...');
       
       const hasXmlDeclaration = xmlContent.includes('<?xml');
       const hasIwxxmContent = xmlContent.toLowerCase().includes('iwxxm');
@@ -219,20 +222,7 @@ test.describe('TAC File Conversion', () => {
     console.log('🧪 Testing: Manual METAR input conversion');
     console.log('=====================================');
 
-    // Login
-    console.log('Step 1: Logging in...');
-    await page.getByPlaceholder(/email/i).fill('admin@metar.local');
-    await page.getByPlaceholder(/password/i).fill('Admin123456!');
-    await page.getByRole('button', { name: /sign in|login/i }).click();
-    
-    // Navigate to File Converter
-    console.log('Step 2: Navigating to File Converter...');
-    await page.getByRole('button', { name: /file converter/i }).click();
-    await page.waitForTimeout(1000);
-    
-    // Wait for converter to load
-    console.log('Step 3: Waiting for converter to load...');
-    await page.getByText(/METAR.*IWXXM.*Converter/i).waitFor({ state: 'visible', timeout: 10000 });
+    await loginAndOpenConverter(page);
 
     // Enter METAR content
     console.log('Step 4: Entering METAR content...');
@@ -258,24 +248,35 @@ test.describe('TAC File Conversion', () => {
     console.log('✓ Manual METAR input test completed');
   });
 
+  test('Manual COR METAR input converts to corrected IWXXM', async ({ page }) => {
+    console.log('🧪 Testing: Manual COR METAR input conversion');
+    console.log('=====================================');
+
+    await loginAndOpenConverter(page);
+
+    const inputTextarea = page.locator('textarea').first();
+    await inputTextarea.waitFor({ state: 'attached', timeout: 5000 });
+    await inputTextarea.fill('METAR COR FAOR 101200Z 12012KT 9999 FEW020 22/14 Q1018');
+
+    const convertButton = page.locator('button[aria-label*="Convert"]').first();
+    await expect(convertButton).toBeVisible();
+    await convertButton.click();
+    await page.waitForTimeout(4000);
+
+    const xmlOutput = page.locator('pre').filter({ hasText: /iwxxm|<metar:/i }).first();
+    await expect(xmlOutput).toBeVisible({ timeout: 10000 });
+
+    const xmlContent = await xmlOutput.textContent();
+    expect(xmlContent).toBeTruthy();
+    expect(xmlContent).toContain('reportStatus="CORRECTION"');
+    expect(xmlContent).not.toContain('translationFailedTAC');
+  });
+
   test('Clear textarea and re-enter content', async ({ page }) => {
     console.log('🧪 Testing: Clear and re-enter TAC content');
     console.log('=====================================');
 
-    // Login
-    console.log('Step 1: Logging in...');
-    await page.getByPlaceholder(/email/i).fill('admin@metar.local');
-    await page.getByPlaceholder(/password/i).fill('Admin123456!');
-    await page.getByRole('button', { name: /sign in|login/i }).click();
-    
-    // Navigate to File Converter
-    console.log('Step 2: Navigating to File Converter...');
-    await page.getByRole('button', { name: /file converter/i }).click();
-    await page.waitForTimeout(1000);
-    
-    // Wait for converter to load
-    console.log('Step 3: Waiting for converter to load...');
-    await page.getByText(/METAR.*IWXXM.*Converter/i).waitFor({ state: 'visible', timeout: 10000 });
+    await loginAndOpenConverter(page);
 
     // Enter TAC content
     console.log('Step 4: Entering initial TAC content...');
@@ -321,20 +322,7 @@ test.describe('TAC File Conversion', () => {
     console.log('🧪 Testing: Error handling for invalid input');
     console.log('=====================================');
 
-    // Login
-    console.log('Step 1: Logging in...');
-    await page.getByPlaceholder(/email/i).fill('admin@metar.local');
-    await page.getByPlaceholder(/password/i).fill('Admin123456!');
-    await page.getByRole('button', { name: /sign in|login/i }).click();
-    
-    // Navigate to File Converter
-    console.log('Step 2: Navigating to File Converter...');
-    await page.getByRole('button', { name: /file converter/i }).click();
-    await page.waitForTimeout(1000);
-    
-    // Wait for converter to load
-    console.log('Step 3: Waiting for converter to load...');
-    await page.getByText(/METAR.*IWXXM.*Converter/i).waitFor({ state: 'visible', timeout: 10000 });
+    await loginAndOpenConverter(page);
 
     // Enter invalid content
     console.log('Step 4: Entering invalid content...');
