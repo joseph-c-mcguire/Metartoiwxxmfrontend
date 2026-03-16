@@ -14,7 +14,9 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "DEBUG=1 playwright test --debug",
     "test:e2e:headed": "playwright test --headed",
-    "lint": "eslint src --ext .ts,.tsx --max-warnings 0"
+    "lint": "eslint src --ext .ts,.tsx --max-warnings 0",
+    "audit": "npm audit",
+    "audit:ci": "npm audit --audit-level=low"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",
