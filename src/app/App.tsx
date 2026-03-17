@@ -15,7 +15,7 @@ import { isLoggedIn, logout } from '@/utils/authService';
 function validateAuthEnv() {
   const authServiceUrl = import.meta.env.VITE_AUTH_SERVICE_URL;
 
-  if (!authServiceUrl) {
+  if (!authServiceUrl?.trim()) {
     const errorMsg = '❌ Missing VITE_AUTH_SERVICE_URL environment variable. Please check .env.local file.';
     console.error(errorMsg);
     toast.error(errorMsg);
@@ -38,6 +38,10 @@ function App() {
   // Validate environment on mount
   useEffect(() => {
     validateAuthEnv();
+
+    if (window.location.pathname.includes('/auth/callback')) {
+      setCurrentView('callback');
+    }
   }, []);
 
   const handleLogin = (email: string, needsVerification: boolean, token?: string, adminStatus?: boolean) => {

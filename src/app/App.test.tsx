@@ -1,7 +1,16 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+
+const authServiceMocks = vi.hoisted(() => ({
+  isLoggedIn: vi.fn(),
+  logout: vi.fn(),
+}))
+
+const toastMocks = vi.hoisted(() => ({
+  error: vi.fn(),
+}))
 
 // Setup all mocks FIRST before any imports
 vi.mock('/utils/supabase/client', () => {
@@ -15,6 +24,22 @@ vi.mock('/utils/supabase/client', () => {
     },
   }
 }, { virtual: true })
+
+vi.mock('@/utils/authService', () => ({
+  isLoggedIn: authServiceMocks.isLoggedIn,
+  logout: authServiceMocks.logout,
+}))
+
+vi.mock('sonner', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('sonner')>()
+  return {
+    ...mod,
+    toast: {
+      ...mod.toast,
+      error: toastMocks.error,
+    },
+  }
+})
 
 vi.mock('./components/FileConverter', () => ({
   FileConverter: ({ onLogout, userEmail, onSwitchToAdmin }: any) => (
@@ -30,6 +55,8 @@ vi.mock('./components/auth/Login', () => ({
   Login: ({ onLogin, onSwitchToRegister, onForgotPassword }: any) => (
     <div data-testid="login-view">
       <button onClick={() => onLogin('test@example.com', false, 'token', false)} data-testid="do-login">Login</button>
+      <button onClick={() => onLogin('admin@example.com', false, 'token', true)} data-testid="do-admin-login">Admin Login</button>
+      <button onClick={() => onLogin('pending@example.com', true, 'token', false)} data-testid="do-login-requires-verify">Login Needs Verify</button>
       <button onClick={onSwitchToRegister} data-testid="switch-register">Register</button>
       <button onClick={onForgotPassword} data-testid="forgot-password">Reset</button>
     </div>
@@ -57,7 +84,8 @@ vi.mock('./components/auth/EmailVerification', () => ({
   EmailVerification: ({ email, onVerified, onBackToLogin }: any) => (
     <div data-testid="verify-view">
       <div>{email}</div>
-      <button onClick={() => onVerified('token', false)} data-testid="verify-email">Verify</button>
+      <button onClick={() => onVerified('token', false)} data-testid="verify-email-user">Verify User</button>
+      <button onClick={() => onVerified('token', true)} data-testid="verify-email-admin">Verify Admin</button>
       <button onClick={onBackToLogin} data-testid="verify-back">Back</button>
     </div>
   ),
@@ -67,6 +95,7 @@ vi.mock('./components/auth/AuthCallback', () => ({
   AuthCallback: ({ onLogin }: any) => (
     <div data-testid="callback-view">
       <button onClick={() => onLogin('callback@example.com', false, 'token', false)} data-testid="callback-login">Callback Login</button>
+      <button onClick={() => onLogin('callback-admin@example.com', false, 'token', true)} data-testid="callback-login-admin">Callback Admin Login</button>
     </div>
   ),
 }))
@@ -86,38 +115,231 @@ vi.mock('./components/ui/sonner', () => ({
 }))
 
 // Now import App and mocked dependencies
-import { supabase } from '/utils/supabase/client'
 import App from './App'
 
 describe('App Component', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     localStorage.clear()
-  })
-
-  afterEach(() => {
-    vi.resetAllMocks()
+    authServiceMocks.isLoggedIn.mockReturnValue(false)
+    authServiceMocks.logout.mockResolvedValue(undefined)
+    vi.unstubAllEnvs()
+    vi.stubEnv('VITE_AUTH_SERVICE_URL', 'https://auth.example.com')
   })
 
   describe('Rendering and Initial State', () => {
-    it('should render the app component', () => {
+    it('renders login view by default when not logged in', () => {
       const { container } = render(<App />)
       expect(container).toBeTruthy()
+      expect(screen.getByTestId('login-view')).toBeInTheDocument()
+      expect(authServiceMocks.isLoggedIn).toHaveBeenCalledTimes(1)
     })
 
-    it.skip('should display Toaster component', async () => {
-      // Skipping due to complex supabase mock requirements
-      // The Toaster component is rendered in App.tsx line 221
-      const { container } = render(<App />)
-      await waitFor(() => {
-        expect(container).toBeTruthy()
-      })
-      const toaster = screen.queryByTestId('toaster')
-      if (toaster) {
-        expect(toaster).toBeInTheDocument()
-      } else {
-        expect(screen.getByTestId('login-view')).toBeInTheDocument()
-      }
+    it('renders converter by default when already logged in', () => {
+      authServiceMocks.isLoggedIn.mockReturnValue(true)
+      render(<App />)
+
+      expect(screen.getByTestId('file-converter')).toBeInTheDocument()
+      expect(screen.queryByTestId('login-view')).not.toBeInTheDocument()
+    })
+
+    it('shows toaster and reports missing auth env', () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      vi.unstubAllEnvs()
+      vi.stubEnv('VITE_AUTH_SERVICE_URL', '')
+
+      render(<App />)
+
+      expect(screen.getByTestId('toaster')).toBeInTheDocument()
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1)
+      expect(toastMocks.error).toHaveBeenCalledTimes(1)
+
+      consoleErrorSpy.mockRestore()
+    })
+
+    it('reports missing auth env when value is whitespace', () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      vi.stubEnv('VITE_AUTH_SERVICE_URL', '   ')
+
+      render(<App />)
+
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1)
+      expect(toastMocks.error).toHaveBeenCalledTimes(1)
+
+      consoleErrorSpy.mockRestore()
+    })
+
+    it('reports missing env once per mount', () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      vi.stubEnv('VITE_AUTH_SERVICE_URL', '')
+
+      const first = render(<App />)
+      first.unmount()
+      render(<App />)
+
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(2)
+      expect(toastMocks.error).toHaveBeenCalledTimes(2)
+
+      consoleErrorSpy.mockRestore()
+    })
+  })
+
+  describe('Callback Edge Paths', () => {
+    it('routes callback login to converter view', async () => {
+      const user = userEvent.setup()
+      window.history.pushState({}, '', '/auth/callback')
+
+      render(<App />)
+      expect(await screen.findByTestId('callback-view')).toBeInTheDocument()
+
+      await user.click(screen.getByTestId('callback-login'))
+      expect(await screen.findByTestId('file-converter')).toBeInTheDocument()
+
+      window.history.pushState({}, '', '/')
+    })
+
+    it('routes callback admin login to admin dashboard', async () => {
+      const user = userEvent.setup()
+      window.history.pushState({}, '', '/auth/callback')
+
+      render(<App />)
+      expect(await screen.findByTestId('callback-view')).toBeInTheDocument()
+
+      await user.click(screen.getByTestId('callback-login-admin'))
+      expect(await screen.findByTestId('admin-dashboard')).toBeInTheDocument()
+
+      window.history.pushState({}, '', '/')
+    })
+  })
+
+  describe('Auth State Transitions', () => {
+    it('switches login to register and back to login', async () => {
+      const user = userEvent.setup()
+      render(<App />)
+
+      await user.click(screen.getByTestId('switch-register'))
+      expect(screen.getByTestId('register-view')).toBeInTheDocument()
+
+      await user.click(screen.getByTestId('switch-login'))
+      expect(screen.getByTestId('login-view')).toBeInTheDocument()
+    })
+
+    it('switches login to password reset and back to login', async () => {
+      const user = userEvent.setup()
+      render(<App />)
+
+      await user.click(screen.getByTestId('forgot-password'))
+      expect(screen.getByTestId('reset-view')).toBeInTheDocument()
+
+      await user.click(screen.getByTestId('back-to-login'))
+      expect(screen.getByTestId('login-view')).toBeInTheDocument()
+    })
+
+    it('routes to verify view after register flow', async () => {
+      const user = userEvent.setup()
+      render(<App />)
+
+      await user.click(screen.getByTestId('switch-register'))
+      await user.click(screen.getByTestId('do-register'))
+
+      expect(screen.getByTestId('verify-view')).toBeInTheDocument()
+      expect(screen.getByText('new@example.com')).toBeInTheDocument()
+    })
+
+    it('routes verify flow to converter for non-admin user', async () => {
+      const user = userEvent.setup()
+      render(<App />)
+
+      await user.click(screen.getByTestId('switch-register'))
+      await user.click(screen.getByTestId('do-register'))
+      await user.click(screen.getByTestId('verify-email-user'))
+
+      expect(screen.getByTestId('file-converter')).toBeInTheDocument()
+      expect(screen.queryByTestId('admin-dashboard')).not.toBeInTheDocument()
+    })
+
+    it('routes verify flow to admin for admin user', async () => {
+      const user = userEvent.setup()
+      render(<App />)
+
+      await user.click(screen.getByTestId('switch-register'))
+      await user.click(screen.getByTestId('do-register'))
+      await user.click(screen.getByTestId('verify-email-admin'))
+
+      expect(screen.getByTestId('admin-dashboard')).toBeInTheDocument()
+      expect(screen.queryByTestId('file-converter')).not.toBeInTheDocument()
+    })
+
+    it('keeps regular login users on converter view', async () => {
+      const user = userEvent.setup()
+      render(<App />)
+
+      await user.click(screen.getByTestId('do-login'))
+
+      expect(screen.getByTestId('file-converter')).toBeInTheDocument()
+      expect(screen.queryByTestId('admin-btn')).not.toBeInTheDocument()
+    })
+
+    it('routes admin login users to admin view and supports switch to converter', async () => {
+      const user = userEvent.setup()
+      render(<App />)
+
+      await user.click(screen.getByTestId('do-admin-login'))
+      expect(screen.getByTestId('admin-dashboard')).toBeInTheDocument()
+
+      await user.click(screen.getByTestId('switch-converter'))
+      expect(screen.getByTestId('file-converter')).toBeInTheDocument()
+      expect(screen.getByTestId('admin-btn')).toBeInTheDocument()
+    })
+
+    it('routes login to verify when login response requires verification', async () => {
+      const user = userEvent.setup()
+      render(<App />)
+
+      await user.click(screen.getByTestId('do-login-requires-verify'))
+
+      expect(screen.getByTestId('verify-view')).toBeInTheDocument()
+      expect(screen.getByText('pending@example.com')).toBeInTheDocument()
+    })
+  })
+
+  describe('Logout Behavior', () => {
+    it('logs out from converter and returns to login', async () => {
+      const user = userEvent.setup()
+      render(<App />)
+
+      await user.click(screen.getByTestId('do-login'))
+      await user.click(screen.getByTestId('logout-btn'))
+
+      expect(authServiceMocks.logout).toHaveBeenCalledTimes(1)
+      expect(screen.getByTestId('login-view')).toBeInTheDocument()
+    })
+
+    it('logs out from admin and returns to login', async () => {
+      const user = userEvent.setup()
+      render(<App />)
+
+      await user.click(screen.getByTestId('do-admin-login'))
+      await user.click(screen.getByTestId('admin-logout'))
+
+      expect(authServiceMocks.logout).toHaveBeenCalledTimes(1)
+      expect(screen.getByTestId('login-view')).toBeInTheDocument()
+      expect(screen.queryByTestId('admin-dashboard')).not.toBeInTheDocument()
+    })
+
+    it('resets to login even when logout service throws', async () => {
+      const user = userEvent.setup()
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      authServiceMocks.logout.mockRejectedValueOnce(new Error('logout failed'))
+
+      render(<App />)
+      await user.click(screen.getByTestId('do-login'))
+      await user.click(screen.getByTestId('logout-btn'))
+
+      expect(authServiceMocks.logout).toHaveBeenCalledTimes(1)
+      expect(screen.getByTestId('login-view')).toBeInTheDocument()
+
+      consoleErrorSpy.mockRestore()
     })
   })
 })

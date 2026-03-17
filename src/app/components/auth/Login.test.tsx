@@ -1,34 +1,29 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+
 import { Login } from './Login'
 
-// Mock dependencies
-vi.mock('/utils/supabase/client', () => ({
-  supabase: {
-    auth: {
-      signInWithPassword: vi.fn(),
-      signInWithOtp: vi.fn(),
-    },
-  },
+const mockLogin = vi.hoisted(() => vi.fn())
+const mockToast = vi.hoisted(() => ({
+  success: vi.fn(),
+  error: vi.fn(),
 }))
 
-vi.mock('/utils/supabase/info', () => ({
-  projectId: 'test-project',
-  publicAnonKey: 'test-key',
+vi.mock('@/utils/authService', () => ({
+  login: mockLogin,
 }))
 
 vi.mock('sonner', () => ({
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-    loading: vi.fn(),
-    dismiss: vi.fn(),
-  },
+  toast: mockToast,
 }))
 
-describe('Login Component', () => {
+vi.mock('../ThemeToggle', () => ({
+  ThemeToggle: () => <div data-testid="theme-toggle">Theme Toggle</div>,
+}))
+
+describe('Login', () => {
   const defaultProps = {
     onLogin: vi.fn(),
     onSwitchToRegister: vi.fn(),
@@ -39,222 +34,148 @@ describe('Login Component', () => {
     vi.clearAllMocks()
   })
 
-  // Rendering tests
-  it('should render login form', () => {
+  it('renders login form controls', () => {
     render(<Login {...defaultProps} />)
-    expect(document.body).toBeTruthy()
+
+    expect(screen.getByText('METAR Converter')).toBeInTheDocument()
+    expect(screen.getByLabelText(/email address/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^password$/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /sign in to account/i })).toBeInTheDocument()
+    expect(screen.getByTestId('theme-toggle')).toBeInTheDocument()
   })
 
-  it('should display email input field', () => {
+  it('shows required validation errors for empty form submit', async () => {
+    const user = userEvent.setup()
     render(<Login {...defaultProps} />)
-    const inputs = screen.getAllByRole('textbox')
-    expect(inputs.length).toBeGreaterThan(0)
+
+    await user.click(screen.getByRole('button', { name: /sign in to account/i }))
+
+    expect(await screen.findByText('Email is required')).toBeInTheDocument()
+    expect(await screen.findByText('Password is required')).toBeInTheDocument()
   })
 
-  it('should have password input field', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    const passwordInputs = container.querySelectorAll('input[type="password"]')
-    expect(passwordInputs.length >= 0).toBe(true)
+  it('shows invalid email format error', async () => {
+    const user = userEvent.setup()
+    render(<Login {...defaultProps} />)
+
+    await user.type(screen.getByLabelText(/email address/i), 'invalid-email')
+    await user.type(screen.getByLabelText(/^password$/i), 'secret123')
+    fireEvent.submit(screen.getByRole('button', { name: /sign in to account/i }).closest('form') as HTMLFormElement)
+
+    expect(await screen.findByText('Please enter a valid email address')).toBeInTheDocument()
   })
 
-  it('should have submit button', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    const buttons = container.querySelectorAll('button')
-    expect(buttons.length > 0).toBe(true)
+  it('shows short password validation error', async () => {
+    const user = userEvent.setup()
+    render(<Login {...defaultProps} />)
+
+    await user.type(screen.getByLabelText(/email address/i), 'user@example.com')
+    await user.type(screen.getByLabelText(/^password$/i), '123')
+    await user.click(screen.getByRole('button', { name: /sign in to account/i }))
+
+    expect(await screen.findByText('Password must be at least 6 characters')).toBeInTheDocument()
   })
 
-  it('should have register link', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should have forgot password link', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  // Input validation tests
-  it('should validate email format', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    const inputs = container.querySelectorAll('input[type="email"], input[type="text"]')
-    expect(inputs.length > 0).toBe(true)
-  })
-
-  it('should require password input', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    const passwordInputs = container.querySelectorAll('input[type="password"]')
-    expect(passwordInputs.length >= 0).toBe(true)
-  })
-
-  it('should handle empty email', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should handle empty password', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should validate email format on input', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  // Form submission tests
-  it('should handle form submission', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    const form = container.querySelector('form')
-    expect(form || container).toBeTruthy()
-  })
-
-  it('should call onLogin callback on successful login', () => {
-    const onLogin = vi.fn()
-    const props = { ...defaultProps, onLogin }
-    render(<Login {...props} />)
-    expect(onLogin).toBeDefined()
-  })
-
-  it('should show loading state during login', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should handle login errors', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should handle invalid credentials', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should handle network errors', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  // Navigation tests
-  it('should switch to register on link click', () => {
+  it('calls onSwitchToRegister when register link is clicked', async () => {
+    const user = userEvent.setup()
     const onSwitchToRegister = vi.fn()
-    const props = { ...defaultProps, onSwitchToRegister }
-    const { container } = render(<Login {...props} />)
-    expect(container).toBeTruthy()
+
+    render(
+      <Login
+        {...defaultProps}
+        onSwitchToRegister={onSwitchToRegister}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: /go to registration page/i }))
+    expect(onSwitchToRegister).toHaveBeenCalledTimes(1)
   })
 
-  it('should go to password reset on link click', () => {
-    const onForgotPassword = vi.fn()
-    const props = { ...defaultProps, onForgotPassword }
-    const { container } = render(<Login {...props} />)
-    expect(container).toBeTruthy()
+  it('calls auth login and onLogin on successful submit', async () => {
+    const user = userEvent.setup()
+    const onLogin = vi.fn()
+    mockLogin.mockResolvedValueOnce({
+      user: {
+        email: 'pilot@example.com',
+        metadata: { name: 'Pilot User' },
+      },
+      session: {
+        access_token: 'token-123',
+      },
+    })
+
+    render(<Login {...defaultProps} onLogin={onLogin} />)
+
+    await user.type(screen.getByLabelText(/email address/i), 'pilot@example.com')
+    await user.type(screen.getByLabelText(/^password$/i), 'secret123')
+    await user.click(screen.getByRole('button', { name: /sign in to account/i }))
+
+    await waitFor(() => {
+      expect(mockLogin).toHaveBeenCalledWith({
+        email: 'pilot@example.com',
+        password: 'secret123',
+      })
+      expect(onLogin).toHaveBeenCalledWith('pilot@example.com', false, 'token-123', false)
+    })
+    expect(mockToast.success).toHaveBeenCalledWith('Welcome back, Pilot User!')
   })
 
-  // OTP tests
-  it('should support OTP authentication', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    expect(container).toBeTruthy()
+  it('shows toast error when login response has no session', async () => {
+    const user = userEvent.setup()
+    mockLogin.mockResolvedValueOnce({ user: null, session: null })
+
+    render(<Login {...defaultProps} />)
+
+    await user.type(screen.getByLabelText(/email address/i), 'pilot@example.com')
+    await user.type(screen.getByLabelText(/^password$/i), 'secret123')
+    await user.click(screen.getByRole('button', { name: /sign in to account/i }))
+
+    await waitFor(() => {
+      expect(mockToast.error).toHaveBeenCalledWith('Login failed. Please try again.')
+    })
   })
 
-  it('should handle OTP input', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    expect(container).toBeTruthy()
+  it('shows service error message when login throws', async () => {
+    const user = userEvent.setup()
+    mockLogin.mockRejectedValueOnce(new Error('Invalid credentials'))
+
+    render(<Login {...defaultProps} />)
+
+    await user.type(screen.getByLabelText(/email address/i), 'pilot@example.com')
+    await user.type(screen.getByLabelText(/^password$/i), 'secret123')
+    await user.click(screen.getByRole('button', { name: /sign in to account/i }))
+
+    await waitFor(() => {
+      expect(mockToast.error).toHaveBeenCalledWith('Invalid credentials')
+    })
   })
 
-  it('should handle OTP verification', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    expect(container).toBeTruthy()
+  it('falls back to user email in welcome toast when metadata.name is missing', async () => {
+    const user = userEvent.setup()
+    const onLogin = vi.fn()
+    mockLogin.mockResolvedValueOnce({
+      user: {
+        email: 'nometadata@example.com',
+        metadata: undefined,
+      },
+      session: { access_token: 'tok-abc' },
+    })
+
+    render(<Login {...defaultProps} onLogin={onLogin} />)
+
+    await user.type(screen.getByLabelText(/email address/i), 'nometadata@example.com')
+    await user.type(screen.getByLabelText(/^password$/i), 'secret123')
+    await user.click(screen.getByRole('button', { name: /sign in to account/i }))
+
+    await waitFor(() => {
+      expect(mockToast.success).toHaveBeenCalledWith('Welcome back, nometadata@example.com!')
+    })
   })
 
-  // Toggle/state tests
-  it('should toggle between password and OTP modes', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
+  it('renders the remember-me checkbox and forgot-password reset button', () => {
+    render(<Login {...defaultProps} />)
 
-  it('should reset form on successful login', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should maintain form state on error', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should show password toggle', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    const toggleButtons = container.querySelectorAll('[aria-label*="password"], [aria-label*="show"]')
-    expect(toggleButtons.length >= 0).toBe(true)
-  })
-
-  // Accessibility tests
-  it('should have proper form structure', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    const form = container.querySelector('form')
-    expect(form || container).toBeTruthy()
-  })
-
-  it('should have accessible labels', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    const labels = container.querySelectorAll('label')
-    expect(labels.length >= 0).toBe(true)
-  })
-
-  it('should support keyboard navigation', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should have proper error announcements', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  // Component lifecycle tests
-  it('should mount without errors', () => {
-    expect(() => {
-      render(<Login {...defaultProps} />)
-    }).not.toThrow()
-  })
-
-  it('should unmount cleanly', () => {
-    const { unmount } = render(<Login {...defaultProps} />)
-    expect(() => {
-      unmount()
-    }).not.toThrow()
-  })
-
-  it('should handle prop updates', () => {
-    const { rerender } = render(<Login {...defaultProps} />)
-    expect(() => {
-      rerender(<Login {...defaultProps} />)
-    }).not.toThrow()
-  })
-
-  // Edge cases
-  it('should handle very long email', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should handle special characters in password', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should prevent form submission with enter key on empty form', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should handle rapid form submissions', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should handle browser autofill', () => {
-    const { container } = render(<Login {...defaultProps} />)
-    expect(container).toBeTruthy()
+    expect(screen.getByLabelText(/remember me/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/forgot password/i)).toBeInTheDocument()
   })
 })

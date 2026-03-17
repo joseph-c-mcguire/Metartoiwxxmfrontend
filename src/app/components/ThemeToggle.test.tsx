@@ -3,6 +3,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ThemeToggle } from './ThemeToggle'
+import * as nextThemes from 'next-themes'
+
+// Mock next-themes
+vi.mock('next-themes', () => ({
+  useTheme: vi.fn(() => ({ theme: 'light', setTheme: vi.fn() }))
+}))
 
 describe('ThemeToggle Component', () => {
   beforeEach(() => {
@@ -16,7 +22,7 @@ describe('ThemeToggle Component', () => {
     localStorage.clear()
   })
 
-  describe('Rendering', () => {
+  describe('Rendering and Theme', () => {
     it('should render theme toggle button', () => {
       const { container } = render(<ThemeToggle />)
       const button = container.querySelector('button')
@@ -27,6 +33,42 @@ describe('ThemeToggle Component', () => {
       const { container } = render(<ThemeToggle />)
       const button = container.querySelector('button')
       expect(button?.querySelector('svg')).toBeTruthy()
+    })
+
+    it('renders moon icon and aria-checked=true when theme is dark', () => {
+      const mockUseTheme = vi.mocked(nextThemes.useTheme)
+      mockUseTheme.mockReturnValueOnce({
+        theme: 'dark',
+        setTheme: vi.fn(),
+        themes: [],
+        systemTheme: undefined,
+        resolvedTheme: undefined,
+      } as any)
+      
+      const { container } = render(<ThemeToggle />)
+      const button = container.querySelector('button')
+      
+      expect(button?.getAttribute('aria-checked')).toBe('true')
+      expect(button?.getAttribute('aria-label')).toContain('light')
+      expect(button?.querySelector('svg')).toBeTruthy() // Has moon icon
+    })
+
+    it('renders sun icon and aria-checked=false when theme is light', () => {
+      const mockUseTheme = vi.mocked(nextThemes.useTheme)
+      mockUseTheme.mockReturnValueOnce({
+        theme: 'light',
+        setTheme: vi.fn(),
+        themes: [],
+        systemTheme: undefined,
+        resolvedTheme: undefined,
+      } as any)
+      
+      const { container } = render(<ThemeToggle />)
+      const button = container.querySelector('button')
+      
+      expect(button?.getAttribute('aria-checked')).toBe('false')
+      expect(button?.getAttribute('aria-label')).toContain('dark')
+      expect(button?.querySelector('svg')).toBeTruthy() // Has sun icon
     })
 
     it('should have accessible button attributes', () => {

@@ -24,7 +24,6 @@ export default defineConfig({
         'dist/',
         'tests/',
         '**/*.d.ts',
-        '**/ui/**',
         '**/*.spec.ts',
       ],
       lines: 95,

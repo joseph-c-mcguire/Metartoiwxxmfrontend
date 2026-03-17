@@ -33,3 +33,34 @@ global.IntersectionObserver = class IntersectionObserver {
   }
   unobserve() {}
 } as any
+
+// Mock ResizeObserver used by Radix and charting components
+global.ResizeObserver = class ResizeObserver {
+  constructor() {}
+  disconnect() {}
+  observe() {}
+  unobserve() {}
+} as any
+
+// jsdom does not implement scroll APIs that some UI wrappers call.
+Object.defineProperty(window, 'scrollTo', {
+  writable: true,
+  value: () => {},
+})
+
+// Radix Select expects pointer capture APIs that jsdom does not implement.
+if (!HTMLElement.prototype.hasPointerCapture) {
+  HTMLElement.prototype.hasPointerCapture = () => false
+}
+
+if (!HTMLElement.prototype.setPointerCapture) {
+  HTMLElement.prototype.setPointerCapture = () => {}
+}
+
+if (!HTMLElement.prototype.releasePointerCapture) {
+  HTMLElement.prototype.releasePointerCapture = () => {}
+}
+
+if (!HTMLElement.prototype.scrollIntoView) {
+  HTMLElement.prototype.scrollIntoView = () => {}
+}

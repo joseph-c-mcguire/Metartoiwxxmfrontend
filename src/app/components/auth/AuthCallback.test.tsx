@@ -1,239 +1,135 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, waitFor } from '@testing-library/react';
-import { AuthCallback } from './AuthCallback';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
 
-vi.mock('react-router-dom', () => ({
-  useNavigate: vi.fn(),
-  useSearchParams: vi.fn(() => [new URLSearchParams('code=test'), vi.fn()]),
-}));
+import { AuthCallback } from './AuthCallback'
 
-vi.mock('/utils/supabase/client', () => ({
-  supabase: {
-    auth: {
-      exchangeCodeForSession: vi.fn().mockResolvedValue({ error: null }),
-      onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
-    },
-  },
-}));
+const mockToast = vi.hoisted(() => ({
+  success: vi.fn(),
+  error: vi.fn(),
+}))
 
 vi.mock('sonner', () => ({
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-    loading: vi.fn(),
-    dismiss: vi.fn(),
-  },
-}));
+  toast: mockToast,
+}))
 
-describe('AuthCallback Component', () => {
+describe('AuthCallback', () => {
+  let originalLocation: Location
+
   beforeEach(() => {
-    vi.clearAllMocks();
-  });
+    vi.clearAllMocks()
+    originalLocation = window.location
 
-  // Rendering tests
-  it('should render without errors', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
+    Object.defineProperty(window, 'location', {
+      writable: true,
+      value: {
+        hash: '',
+        href: 'http://localhost/',
+      },
+    })
 
-  it('should initialize properly', () => {
-    expect(() => {
-      render(<AuthCallback />);
-    }).not.toThrow();
-  });
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+  })
 
-  it('should be a valid React component', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container.children.length).toBeGreaterThan(-1);
-  });
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+    Object.defineProperty(window, 'location', {
+      writable: true,
+      value: originalLocation,
+    })
+  })
 
-  // OAuth callback tests
-  it('should handle OAuth authorization code', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
+  it('shows error state by default when no token is present', async () => {
+    render(<AuthCallback />)
 
-  it('should exchange code for session', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Error' })).toBeInTheDocument()
+      expect(screen.getByText('Invalid callback URL. Please try again.')).toBeInTheDocument()
+    })
+  })
 
-  it('should handle successful authentication', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
+  it('shows error state when callback has no access token', async () => {
+    window.location.hash = '#type=signup'
 
-  it('should handle authentication errors', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
+    render(<AuthCallback />)
 
-  it('should handle missing authorization code', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Error' })).toBeInTheDocument()
+      expect(screen.getByText('Invalid callback URL. Please try again.')).toBeInTheDocument()
+      expect(mockToast.error).toHaveBeenCalledWith('Authentication failed')
+    })
 
-  // Loading state tests
-  it('should show loading indicator while exchanging code', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
+    await waitFor(() => {
+      expect(window.location.href).toBe('/')
+      expect(window.location.hash).toBe('')
+    }, { timeout: 3000 })
+  })
 
-  it('should display processing message', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
+  it('handles signup token with onVerified callback', async () => {
+    const onVerified = vi.fn()
+    window.location.hash = '#access_token=abc123&type=signup'
 
-  // Navigation tests
-  it('should redirect after successful authentication', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
+    render(<AuthCallback onVerified={onVerified} />)
 
-  it('should redirect on authentication failure', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Success' })).toBeInTheDocument()
+      expect(screen.getByText('Email verified! Redirecting...')).toBeInTheDocument()
+      expect(mockToast.success).toHaveBeenCalledWith('Email verified successfully!')
+      expect(onVerified).toHaveBeenCalledTimes(1)
+    })
 
-  it('should handle navigation errors', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
+    expect(window.location.hash).toBe('')
+  })
 
-  // Session management tests
-  it('should listen to auth state changes', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
+  it('falls back to onRegister for signup when onVerified is missing', async () => {
+    const onRegister = vi.fn()
+    window.location.hash = '#access_token=abc123&type=signup'
 
-  it('should initialize session after exchange', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
+    render(<AuthCallback onRegister={onRegister} />)
 
-  it('should handle session errors', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
+    await waitFor(() => {
+      expect(onRegister).toHaveBeenCalledWith('')
+    })
+  })
 
-  // URL parameter tests
-  it('should extract code from URL parameters', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
+  it('redirects to reset route for recovery type', async () => {
+    window.location.hash = '#access_token=reset-token&type=recovery'
 
-  it('should handle URL with additional parameters', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
+    render(<AuthCallback />)
 
-  it('should handle malformed URL parameters', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
+    await waitFor(() => {
+      expect(window.location.href).toBe('/auth/reset?token=reset-token')
+    })
+  })
 
-  // Error handling tests
-  it('should handle network errors during code exchange', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
+  it('redirects to home route for default callback type', async () => {
+    window.location.hash = '#access_token=plain-token&type=magiclink'
 
-  it('should handle invalid authorization code', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
+    render(<AuthCallback />)
 
-  it('should handle expired authorization code', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
+    await waitFor(() => {
+      expect(window.location.href).toBe('/')
+    })
+  })
 
-  it('should show error message to user', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
+  it('enters catch path when callback handler throws', async () => {
+    const onVerified = vi.fn(() => {
+      throw new Error('handler failure')
+    })
+    window.location.hash = '#access_token=abc123&type=signup'
 
-  // Provider-specific tests
-  it('should handle Google OAuth callback', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
+    render(<AuthCallback onVerified={onVerified} />)
 
-  it('should handle GitHub OAuth callback', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Error' })).toBeInTheDocument()
+      expect(screen.getByText('An error occurred. Please try again.')).toBeInTheDocument()
+      expect(mockToast.error).toHaveBeenCalledWith('Authentication failed')
+    })
 
-  it('should handle email link authentication', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
-
-  // Component lifecycle tests
-  it('should mount without errors', () => {
-    expect(() => {
-      render(<AuthCallback />);
-    }).not.toThrow();
-  });
-
-  it('should unmount cleanly', () => {
-    const { unmount } = render(<AuthCallback />);
-    expect(() => {
-      unmount();
-    }).not.toThrow();
-  });
-
-  it('should cleanup subscriptions on unmount', () => {
-    const { unmount } = render(<AuthCallback />);
-    expect(() => {
-      unmount();
-    }).not.toThrow();
-  });
-
-  // Security tests
-  it('should not expose sensitive information', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
-
-  it('should handle state parameter for CSRF protection', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
-
-  it('should validate authorization code format', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
-
-  // Accessibility tests
-  it('should have accessible loading indicator', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
-
-  it('should announce status to screen readers', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
-
-  // Edge cases
-  it('should handle rapid component remounts', () => {
-    const { unmount, rerender } = render(<AuthCallback />);
-    unmount();
-    expect(() => {
-      render(<AuthCallback />);
-    }).not.toThrow();
-  });
-
-  it('should handle multiple code exchange attempts', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
-
-  it('should handle race conditions in auth state', () => {
-    const { container } = render(<AuthCallback />);
-    expect(container).toBeTruthy();
-  });
-});
+    await waitFor(() => {
+      expect(window.location.href).toBe('/')
+    }, { timeout: 3000 })
+  })
+})

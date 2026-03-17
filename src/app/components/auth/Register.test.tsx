@@ -1,33 +1,29 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+
 import { Register } from './Register'
 
-// Mock dependencies
-vi.mock('/utils/supabase/client', () => ({
-  supabase: {
-    auth: {
-      signUp: vi.fn(),
-    },
-  },
+const mockRegisterUser = vi.hoisted(() => vi.fn())
+const mockToast = vi.hoisted(() => ({
+  success: vi.fn(),
+  error: vi.fn(),
 }))
 
-vi.mock('/utils/supabase/info', () => ({
-  projectId: 'test-project',
-  publicAnonKey: 'test-key',
+vi.mock('@/utils/authService', () => ({
+  register: mockRegisterUser,
 }))
 
 vi.mock('sonner', () => ({
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-    loading: vi.fn(),
-    dismiss: vi.fn(),
-  },
+  toast: mockToast,
 }))
 
-describe('Register Component', () => {
+vi.mock('../ThemeToggle', () => ({
+  ThemeToggle: () => <div data-testid="theme-toggle">Theme Toggle</div>,
+}))
+
+describe('Register', () => {
   const defaultProps = {
     onRegister: vi.fn(),
     onSwitchToLogin: vi.fn(),
@@ -37,260 +33,126 @@ describe('Register Component', () => {
     vi.clearAllMocks()
   })
 
-  // Rendering tests
-  it('should render register form', () => {
+  it('renders register controls and theme toggle', () => {
     render(<Register {...defaultProps} />)
-    expect(document.body).toBeTruthy()
+
+    expect(screen.getByRole('heading', { name: 'Create Account' })).toBeInTheDocument()
+    expect(screen.getByLabelText(/email address/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^password$/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/confirm password/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /create account/i })).toBeInTheDocument()
+    expect(screen.getByTestId('theme-toggle')).toBeInTheDocument()
   })
 
-  it('should display registration fields', () => {
+  it('shows required validation errors for empty submit', async () => {
     render(<Register {...defaultProps} />)
-    const inputs = screen.getAllByRole('textbox')
-    expect(inputs.length).toBeGreaterThan(0)
+
+    fireEvent.submit(screen.getByRole('button', { name: /create account/i }).closest('form') as HTMLFormElement)
+
+    expect(await screen.findByText('Email is required')).toBeInTheDocument()
+    expect(await screen.findByText('Password is required')).toBeInTheDocument()
+    expect(await screen.findByText('Please confirm your password')).toBeInTheDocument()
   })
 
-  it('should have email input field', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    const emailInputs = container.querySelectorAll('input[type="email"], input[type="text"]')
-    expect(emailInputs.length > 0).toBe(true)
+  it('shows invalid email and mismatched password errors', async () => {
+    const user = userEvent.setup()
+    render(<Register {...defaultProps} />)
+
+    await user.type(screen.getByLabelText(/email address/i), 'invalid-email')
+    await user.type(screen.getByLabelText(/^password$/i), 'secret123')
+    await user.type(screen.getByLabelText(/confirm password/i), 'different456')
+    fireEvent.submit(screen.getByRole('button', { name: /create account/i }).closest('form') as HTMLFormElement)
+
+    expect(await screen.findByText('Please enter a valid email address')).toBeInTheDocument()
+    expect(await screen.findByText('Passwords do not match')).toBeInTheDocument()
   })
 
-  it('should have password input field', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    const passwordInputs = container.querySelectorAll('input[type="password"]')
-    expect(passwordInputs.length >= 0).toBe(true)
+  it('calls onSwitchToLogin when sign-in link is clicked', async () => {
+    const user = userEvent.setup()
+    const onSwitchToLogin = vi.fn()
+    render(<Register {...defaultProps} onSwitchToLogin={onSwitchToLogin} />)
+
+    await user.click(screen.getByRole('button', { name: /go to login page/i }))
+    expect(onSwitchToLogin).toHaveBeenCalledTimes(1)
   })
 
-  it('should have confirm password input field', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    const inputs = container.querySelectorAll('input[type="password"]')
-    expect(inputs.length >= 0).toBe(true)
-  })
-
-  it('should have submit button', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    const buttons = container.querySelectorAll('button')
-    expect(buttons.length > 0).toBe(true)
-  })
-
-  it('should have login switch link', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    expect(container.querySelector('form') || container.querySelector('[role="button"]')).toBeTruthy()
-  })
-
-  // Input validation tests
-  it('should validate email format', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    const inputs = container.querySelectorAll('input')
-    expect(inputs.length > 0).toBe(true)
-  })
-
-  it('should validate password strength', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should validate password confirmation matches', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should handle empty email', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should handle empty password', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should require email and password', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should show password mismatch error', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should show weak password error', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  // Form submission tests
-  it('should handle form submission', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    const form = container.querySelector('form')
-    expect(form || container).toBeTruthy()
-  })
-
-  it('should call onRegister callback on successful registration', () => {
+  it('submits successfully and calls onRegister', async () => {
+    const user = userEvent.setup()
     const onRegister = vi.fn()
-    const props = { ...defaultProps, onRegister }
-    render(<Register {...props} />)
-    expect(onRegister).toBeDefined()
+    mockRegisterUser.mockResolvedValueOnce({
+      user: { email: 'pilot@example.com' },
+      session: null,
+    })
+
+    render(<Register {...defaultProps} onRegister={onRegister} />)
+
+    await user.type(screen.getByLabelText(/email address/i), 'pilot@example.com')
+    await user.type(screen.getByLabelText(/^password$/i), 'secret123')
+    await user.type(screen.getByLabelText(/confirm password/i), 'secret123')
+    await user.click(screen.getByLabelText(/accept terms and conditions/i))
+    await user.click(screen.getByRole('button', { name: /create account/i }))
+
+    await waitFor(() => {
+      expect(mockRegisterUser).toHaveBeenCalledWith({
+        email: 'pilot@example.com',
+        password: 'secret123',
+      })
+      expect(onRegister).toHaveBeenCalledWith('pilot@example.com')
+    })
+    expect(mockToast.success).toHaveBeenCalledWith('Account created! Please check your email to verify your account.')
   })
 
-  it('should show loading state during registration', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    expect(container).toBeTruthy()
+  it('shows toast error when register response has no user', async () => {
+    const user = userEvent.setup()
+    mockRegisterUser.mockResolvedValueOnce({ user: null, session: null })
+
+    render(<Register {...defaultProps} />)
+
+    await user.type(screen.getByLabelText(/email address/i), 'pilot@example.com')
+    await user.type(screen.getByLabelText(/^password$/i), 'secret123')
+    await user.type(screen.getByLabelText(/confirm password/i), 'secret123')
+    await user.click(screen.getByLabelText(/accept terms and conditions/i))
+    await user.click(screen.getByRole('button', { name: /create account/i }))
+
+    await waitFor(() => {
+      expect(mockToast.error).toHaveBeenCalledWith('Registration failed. Please try again.')
+    })
   })
 
-  it('should handle registration errors', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    expect(container).toBeTruthy()
+  it('shows service error message when register throws', async () => {
+    const user = userEvent.setup()
+    mockRegisterUser.mockRejectedValueOnce(new Error('Email already in use'))
+
+    render(<Register {...defaultProps} />)
+
+    await user.type(screen.getByLabelText(/email address/i), 'pilot@example.com')
+    await user.type(screen.getByLabelText(/^password$/i), 'secret123')
+    await user.type(screen.getByLabelText(/confirm password/i), 'secret123')
+    await user.click(screen.getByLabelText(/accept terms and conditions/i))
+    await user.click(screen.getByRole('button', { name: /create account/i }))
+
+    await waitFor(() => {
+      expect(mockToast.error).toHaveBeenCalledWith('Email already in use')
+    })
   })
 
-  it('should handle email already exists error', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    expect(container).toBeTruthy()
+  it('shows short password validation error', async () => {
+    const user = userEvent.setup()
+    render(<Register {...defaultProps} />)
+
+    await user.type(screen.getByLabelText(/email address/i), 'pilot@example.com')
+    await user.type(screen.getByLabelText(/^password$/i), '12345')
+    await user.type(screen.getByLabelText(/confirm password/i), '12345')
+    fireEvent.submit(screen.getByRole('button', { name: /create account/i }).closest('form') as HTMLFormElement)
+
+    expect(await screen.findByText('Password must be at least 6 characters')).toBeInTheDocument()
   })
 
-  it('should handle network errors', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
+  it('renders terms and conditions checkbox', () => {
+    render(<Register {...defaultProps} />)
 
-  it('should handle invalid email error', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  // Navigation tests
-  it('should switch to login on link click', () => {
-    const onSwitchToLogin = vi.fn()
-    const props = { ...defaultProps, onSwitchToLogin }
-    const { container } = render(<Register {...props} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should navigate back to login after registration', () => {
-    const onSwitchToLogin = vi.fn()
-    const props = { ...defaultProps, onSwitchToLogin }
-    const { container } = render(<Register {...props} />)
-    expect(container).toBeTruthy()
-  })
-
-  // Password visibility tests
-  it('should toggle password visibility', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    const toggles = container.querySelectorAll('[aria-label*="password"], [aria-label*="show"]')
-    expect(toggles.length >= 0).toBe(true)
-  })
-
-  it('should toggle confirm password visibility', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  // Password strength indicator tests
-  it('should show password strength indicator', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should update strength indicator on password change', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should show strength requirements', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  // Terms and conditions tests
-  it('should have terms and conditions checkbox', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    const checkboxes = container.querySelectorAll('input[type="checkbox"]')
-    expect(checkboxes.length >= 0).toBe(true)
-  })
-
-  it('should require accepting terms', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  // Accessibility tests
-  it('should have proper form structure', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    const form = container.querySelector('form')
-    expect(form || container).toBeTruthy()
-  })
-
-  it('should have accessible labels', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    const labels = container.querySelectorAll('label')
-    expect(labels.length >= 0).toBe(true)
-  })
-
-  it('should support keyboard navigation', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  // Component lifecycle tests
-  it('should mount without errors', () => {
-    expect(() => {
-      render(<Register {...defaultProps} />)
-    }).not.toThrow()
-  })
-
-  it('should unmount cleanly', () => {
-    const { unmount } = render(<Register {...defaultProps} />)
-    expect(() => {
-      unmount()
-    }).not.toThrow()
-  })
-
-  it('should handle prop updates', () => {
-    const { rerender } = render(<Register {...defaultProps} />)
-    expect(() => {
-      rerender(<Register {...defaultProps} />)
-    }).not.toThrow()
-  })
-
-  // Edge cases
-  it('should handle very long email', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should handle very long password', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should handle special characters in password', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should prevent form submission with empty fields', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should handle rapid form submissions', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should handle browser autofill', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should clear form on successful registration', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    expect(container).toBeTruthy()
-  })
-
-  it('should maintain form state on validation error', () => {
-    const { container } = render(<Register {...defaultProps} />)
-    expect(container).toBeTruthy()
+    const terms = screen.getByLabelText(/accept terms and conditions/i)
+    expect(terms).toBeInTheDocument()
+    expect(terms).not.toBeChecked()
   })
 })

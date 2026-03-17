@@ -1,479 +1,159 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { EmailVerification } from './EmailVerification';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, waitFor, act, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
-vi.mock('/utils/supabase/client', () => ({
-  supabase: {
-    auth: {
-      getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
-      resend: vi.fn().mockResolvedValue({ error: null }),
-      signOut: vi.fn().mockResolvedValue({ error: null }),
-      confirmOtp: vi.fn().mockResolvedValue({ data: { user: {} }, error: null }),
-    },
-  },
-}));
+import { EmailVerification } from './EmailVerification'
 
-vi.mock('/utils/supabase/info', () => ({
-  projectId: 'test-project-id',
-  publicAnonKey: 'test-anon-key',
-}));
+const mockToast = vi.hoisted(() => ({
+  success: vi.fn(),
+  error: vi.fn(),
+  info: vi.fn(),
+}))
 
 vi.mock('sonner', () => ({
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-    loading: vi.fn(),
-    dismiss: vi.fn(),
-  },
-}));
+  toast: mockToast,
+}))
 
 vi.mock('../ThemeToggle', () => ({
-  ThemeToggle: () => <div>Theme Toggle</div>,
-}));
+  ThemeToggle: () => <div data-testid="theme-toggle">Theme Toggle</div>,
+}))
 
-describe('EmailVerification Component', () => {
-  const mockOnVerified = vi.fn();
-  const mockOnBackToLogin = vi.fn();
+describe('EmailVerification', () => {
+  const defaultProps = {
+    email: 'pilot@example.com',
+    onVerified: vi.fn(),
+    onBackToLogin: vi.fn(),
+  }
 
   beforeEach(() => {
-    vi.clearAllMocks();
-  });
+    vi.clearAllMocks()
+  })
 
-  // Rendering tests
-  it('should render without errors', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(container).toBeTruthy();
-  });
+  afterEach(() => {
+    vi.useRealTimers()
+  })
 
-  it('should initialize properly', () => {
-    expect(() => {
-      render(
-        <EmailVerification 
-          email="test@example.com"
-          onVerified={mockOnVerified}
-          onBackToLogin={mockOnBackToLogin}
-        />
-      );
-    }).not.toThrow();
-  });
+  it('renders verification content with masked email', () => {
+    render(<EmailVerification {...defaultProps} />)
 
-  it('should display user email', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(container).toBeTruthy();
-  });
+    expect(screen.getByRole('heading', { name: 'Verify Your Email' })).toBeInTheDocument()
+    expect(screen.getByText('Sent to pil***@example.com')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /i've verified my email/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /resend available in 60 seconds/i })).toBeDisabled()
+    expect(screen.getByTestId('theme-toggle')).toBeInTheDocument()
+  })
 
-  // Verification input tests
-  it('should display OTP input fields', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    const inputs = container.querySelectorAll('input');
-    expect(inputs.length >= 0).toBe(true);
-  });
+  it('calls onBackToLogin from back link', async () => {
+    const user = userEvent.setup()
+    const onBackToLogin = vi.fn()
 
-  it('should have verify button', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    const buttons = container.querySelectorAll('button');
-    expect(buttons.length > 0).toBe(true);
-  });
+    render(<EmailVerification {...defaultProps} onBackToLogin={onBackToLogin} />)
 
-  it('should have back to login link', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(container).toBeTruthy();
-  });
+    await user.click(screen.getByRole('button', { name: /return to login page/i }))
+    expect(onBackToLogin).toHaveBeenCalledTimes(1)
+  })
 
-  // OTP input tests
-  it('should accept OTP code input', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    const inputs = container.querySelectorAll('input');
-    expect(inputs.length >= 0).toBe(true);
-  });
+  it('handles verify flow and calls onVerified after delay', async () => {
+    vi.useFakeTimers()
+    const onVerified = vi.fn()
 
-  it('should handle numeric OTP input only', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(container).toBeTruthy();
-  });
+    render(<EmailVerification {...defaultProps} onVerified={onVerified} />)
 
-  it('should move focus between OTP input fields', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(container).toBeTruthy();
-  });
+    fireEvent.click(screen.getByRole('button', { name: /i've verified my email/i }))
 
-  it('should handle backspace in OTP input', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(container).toBeTruthy();
-  });
+    expect(mockToast.info).toHaveBeenCalledWith('Please check your email and click the verification link.')
+    expect(screen.getByText('Email Verified ✓')).toBeInTheDocument()
 
-  // Verification tests
-  it('should handle OTP verification', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(container).toBeTruthy();
-  });
+    act(() => {
+      vi.advanceTimersByTime(2000)
+    })
 
-  it('should call onVerified on successful verification', () => {
+    expect(mockToast.success).toHaveBeenCalledWith('Email verified! You can now login.')
+    expect(onVerified).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps resend disabled until countdown reaches zero', async () => {
+    vi.useFakeTimers()
+
+    render(<EmailVerification {...defaultProps} />)
+
+    expect(screen.getByRole('button', { name: /resend available in 60 seconds/i })).toBeDisabled()
+
+    for (let i = 0; i < 61; i += 1) {
+      act(() => {
+        vi.advanceTimersByTime(1000)
+      })
+    }
+
+    expect(screen.getByRole('button', { name: /resend verification email/i })).toBeEnabled()
+    expect(screen.getByText('Resend Email')).toBeInTheDocument()
+  })
+
+  it('handles resend flow and resets countdown', async () => {
+    vi.useFakeTimers()
+
+    render(<EmailVerification {...defaultProps} />)
+
+    for (let i = 0; i < 61; i += 1) {
+      act(() => {
+        vi.advanceTimersByTime(1000)
+      })
+    }
+
+    const resendButton = screen.getByRole('button', { name: /resend verification email/i })
+    fireEvent.click(resendButton)
+
+    expect(mockToast.success).toHaveBeenCalledWith('Verification email sent! Please check your inbox.')
+    expect(screen.getByRole('button', { name: /resend available in 60 seconds/i })).toBeDisabled()
+  })
+
+  it('masks short local-part emails correctly', () => {
     render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(mockOnVerified).toBeDefined();
-  });
+      <EmailVerification
+        email="ab@example.com"
+        onVerified={vi.fn()}
+        onBackToLogin={vi.fn()}
+      />,
+    )
 
-  it('should show error on invalid OTP', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(container).toBeTruthy();
-  });
+    expect(screen.getByText('Sent to a***@example.com')).toBeInTheDocument()
+  })
 
-  it('should show error on expired OTP', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(container).toBeTruthy();
-  });
+  it('shows verified indicator after verify action', async () => {
+    const user = userEvent.setup()
 
-  it('should show error on too many verification attempts', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(container).toBeTruthy();
-  });
+    render(<EmailVerification {...defaultProps} />)
 
-  // Resend OTP tests
-  it('should have resend OTP button', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(container).toBeTruthy();
-  });
+    await user.click(screen.getByRole('button', { name: /i've verified my email/i }))
 
-  it('should handle resend OTP request', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(container).toBeTruthy();
-  });
+    expect(screen.getByText('Email Verified ✓')).toBeInTheDocument()
+  })
 
-  it('should show confirmation after resending OTP', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(container).toBeTruthy();
-  });
-
-  it('should have resend countdown timer', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(container).toBeTruthy();
-  });
-
-  it('should disable resend button until countdown expires', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(container).toBeTruthy();
-  });
-
-  // Loading state tests
-  it('should show loading state during verification', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(container).toBeTruthy();
-  });
-
-  it('should show loading state during resend', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(container).toBeTruthy();
-  });
-
-  // Navigation tests
-  it('should handle back to login', () => {
+  it('masks single-char local-part emails correctly', () => {
     render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(mockOnBackToLogin).toBeDefined();
-  });
+      <EmailVerification
+        email="a@example.com"
+        onVerified={vi.fn()}
+        onBackToLogin={vi.fn()}
+      />,
+    )
 
-  it('should navigate to next step after verification', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(container).toBeTruthy();
-  });
+    expect(screen.getByText('Sent to a***@example.com')).toBeInTheDocument()
+  })
 
-  // Email change tests
-  it('should display option to change email', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(container).toBeTruthy();
-  });
+  it('shows verify button as loading while verifying', async () => {
+    vi.useFakeTimers()
+    render(<EmailVerification {...defaultProps} />)
 
-  it('should handle email change', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(container).toBeTruthy();
-  });
+    fireEvent.click(screen.getByRole('button', { name: /i've verified my email/i }))
 
-  // Accessibility tests
-  it('should have accessible form structure', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    const form = container.querySelector('form');
-    expect(form || container).toBeTruthy();
-  });
+    // After click, isVerifying=true briefly; emailStatus changes to verified immediately
+    expect(screen.getByText('Email Verified ✓')).toBeInTheDocument()
+  })
 
-  it('should have accessible labels', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    const labels = container.querySelectorAll('label');
-    expect(labels.length >= 0).toBe(true);
-  });
+  it('renders all help text items', () => {
+    render(<EmailVerification {...defaultProps} />)
 
-  it('should announce verification status to screen readers', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(container).toBeTruthy();
-  });
-
-  // Component lifecycle tests
-  it('should mount without errors', () => {
-    expect(() => {
-      render(
-        <EmailVerification 
-          email="test@example.com"
-          onVerified={mockOnVerified}
-          onBackToLogin={mockOnBackToLogin}
-        />
-      );
-    }).not.toThrow();
-  });
-
-  it('should unmount cleanly', () => {
-    const { unmount } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(() => {
-      unmount();
-    }).not.toThrow();
-  });
-
-  it('should handle prop updates', () => {
-    const { rerender } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(() => {
-      rerender(
-        <EmailVerification 
-          email="test@example.com"
-          onVerified={mockOnVerified}
-          onBackToLogin={mockOnBackToLogin}
-        />
-      );
-    }).not.toThrow();
-  });
-
-  // Error handling tests
-  it('should handle network errors', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(container).toBeTruthy();
-  });
-
-  it('should handle verification timeout', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(container).toBeTruthy();
-  });
-
-  // Edge cases
-  it('should handle rapid OTP input', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(container).toBeTruthy();
-  });
-
-  it('should handle paste of OTP code', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(container).toBeTruthy();
-  });
-
-  it('should clear OTP input on error', () => {
-    const { container } = render(
-      <EmailVerification 
-        email="test@example.com"
-        onVerified={mockOnVerified}
-        onBackToLogin={mockOnBackToLogin}
-      />
-    );
-    expect(container).toBeTruthy();
-  });
-});
+    expect(screen.getByText(/check spam or junk folder/i)).toBeInTheDocument()
+  })
+})

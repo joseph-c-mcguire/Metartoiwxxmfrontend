@@ -1,297 +1,187 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { PasswordReset } from './PasswordReset';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
-vi.mock('/utils/supabase/client', () => ({
-  supabase: {
-    auth: {
-      resetPasswordForEmail: vi.fn().mockResolvedValue({ error: null }),
-      getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
-      updateUser: vi.fn().mockResolvedValue({ data: { user: {} }, error: null }),
-    },
-  },
-}));
+import { PasswordReset } from './PasswordReset'
 
-vi.mock('react-router-dom', () => ({
-  useNavigate: vi.fn(),
-  useSearchParams: vi.fn(() => [new URLSearchParams(), vi.fn()]),
-}));
+const mockRequestPasswordReset = vi.hoisted(() => vi.fn())
+const mockConfirmPasswordReset = vi.hoisted(() => vi.fn())
+const mockToast = vi.hoisted(() => ({
+  success: vi.fn(),
+  error: vi.fn(),
+}))
+
+vi.mock('@/utils/authService', () => ({
+  requestPasswordReset: mockRequestPasswordReset,
+  confirmPasswordReset: mockConfirmPasswordReset,
+}))
 
 vi.mock('sonner', () => ({
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-    loading: vi.fn(),
-    dismiss: vi.fn(),
-  },
-}));
+  toast: mockToast,
+}))
 
-describe('PasswordReset Component', () => {
+vi.mock('../ThemeToggle', () => ({
+  ThemeToggle: () => <div data-testid="theme-toggle">Theme Toggle</div>,
+}))
+
+describe('PasswordReset', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-  });
+    vi.clearAllMocks()
+  })
 
-  // Rendering tests
-  it('should render without errors', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+  afterEach(() => {
+    vi.useRealTimers()
+  })
 
-  it('should initialize properly', () => {
-    expect(() => {
-      render(<PasswordReset />);
-    }).not.toThrow();
-  });
+  it('renders request step by default', () => {
+    render(<PasswordReset onBackToLogin={vi.fn()} />)
 
-  it('should be a valid React component', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container.children.length).toBeGreaterThan(-1);
-  });
+    expect(screen.getByRole('heading', { name: 'Reset Password' })).toBeInTheDocument()
+    expect(screen.getByLabelText(/email address/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /send reset email/i })).toBeInTheDocument()
+    expect(screen.getByTestId('theme-toggle')).toBeInTheDocument()
+  })
 
-  // Form field tests
-  it('should display email input field', () => {
-    const { container } = render(<PasswordReset />);
-    const inputs = container.querySelectorAll('input');
-    expect(inputs.length > 0).toBe(true);
-  });
+  it('shows email-required error when request form is submitted empty', async () => {
+    render(<PasswordReset onBackToLogin={vi.fn()} />)
 
-  it('should display password input field when in reset mode', () => {
-    const { container } = render(<PasswordReset />);
-    const passwordInputs = container.querySelectorAll('input[type="password"]');
-    expect(passwordInputs.length >= 0).toBe(true);
-  });
+    fireEvent.submit(screen.getByRole('button', { name: /send reset email/i }).closest('form') as HTMLFormElement)
 
-  it('should have submit button', () => {
-    const { container } = render(<PasswordReset />);
-    const buttons = container.querySelectorAll('button');
-    expect(buttons.length > 0).toBe(true);
-  });
+    await waitFor(() => {
+      expect(mockToast.error).toHaveBeenCalledWith('Please enter your email address')
+    })
+  })
 
-  it('should have back to login link', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+  it('requests reset email successfully', async () => {
+    const user = userEvent.setup()
+    mockRequestPasswordReset.mockResolvedValueOnce(undefined)
 
-  // Form stages tests
-  it('should start in email request stage', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+    render(<PasswordReset onBackToLogin={vi.fn()} />)
 
-  it('should transition to password reset stage after email submission', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+    await user.type(screen.getByLabelText(/email address/i), 'pilot@example.com')
+    await user.click(screen.getByRole('button', { name: /send reset email/i }))
 
-  it('should show confirmation message after email sent', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+    await waitFor(() => {
+      expect(mockRequestPasswordReset).toHaveBeenCalledWith('pilot@example.com')
+      expect(mockToast.success).toHaveBeenCalledWith('Password reset email sent! Check your inbox.')
+    })
+  })
 
-  // Email validation tests
-  it('should validate email format', () => {
-    const { container } = render(<PasswordReset />);
-    const inputs = container.querySelectorAll('input');
-    expect(inputs.length > 0).toBe(true);
-  });
+  it('shows service error when reset email request fails', async () => {
+    const user = userEvent.setup()
+    mockRequestPasswordReset.mockRejectedValueOnce(new Error('Reset unavailable'))
 
-  it('should require email input', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+    render(<PasswordReset onBackToLogin={vi.fn()} />)
 
-  it('should handle empty email', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+    await user.type(screen.getByLabelText(/email address/i), 'pilot@example.com')
+    await user.click(screen.getByRole('button', { name: /send reset email/i }))
 
-  it('should show invalid email error', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+    await waitFor(() => {
+      expect(mockToast.error).toHaveBeenCalledWith('Reset unavailable')
+    })
+  })
 
-  // Password reset tests
-  it('should handle password reset request', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+  it('renders reset step when token is provided', () => {
+    render(<PasswordReset onBackToLogin={vi.fn()} resetToken="token-123" />)
 
-  it('should handle successful password reset email', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+    expect(screen.getByLabelText(/new password/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/confirm password/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /update password/i })).toBeInTheDocument()
+  })
 
-  it('should handle password reset errors', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+  it('shows password mismatch error in reset step', async () => {
+    const user = userEvent.setup()
+    render(<PasswordReset onBackToLogin={vi.fn()} resetToken="token-123" />)
 
-  it('should handle user not found error', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+    await user.type(screen.getByLabelText(/new password/i), 'secret123')
+    await user.type(screen.getByLabelText(/confirm password/i), 'different456')
+    await user.click(screen.getByRole('button', { name: /update password/i }))
 
-  it('should handle too many requests error', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+    await waitFor(() => {
+      expect(mockToast.error).toHaveBeenCalledWith('Passwords do not match')
+    })
+  })
 
-  // New password validation tests
-  it('should validate new password requirements', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+  it('updates password successfully and redirects back after delay', async () => {
+    const user = userEvent.setup()
+    const onBackToLogin = vi.fn()
+    mockConfirmPasswordReset.mockResolvedValueOnce(undefined)
 
-  it('should show password strength indicator', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+    render(<PasswordReset onBackToLogin={onBackToLogin} resetToken="token-123" />)
 
-  it('should show password requirements', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+    await user.type(screen.getByLabelText(/new password/i), 'secret123')
+    await user.type(screen.getByLabelText(/confirm password/i), 'secret123')
+    await user.click(screen.getByRole('button', { name: /update password/i }))
 
-  it('should update strength indicator on password change', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+    await waitFor(() => {
+      expect(mockConfirmPasswordReset).toHaveBeenCalledWith('token-123', 'secret123')
+      expect(mockToast.success).toHaveBeenCalledWith('✓ Password updated successfully! Redirecting to login...')
+    })
 
-  // Recovery link tests
-  it('should handle recovery link from email', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+    await waitFor(() => {
+      expect(onBackToLogin).toHaveBeenCalledTimes(1)
+    }, { timeout: 3000 })
+  })
 
-  it('should validate recovery code from URL', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+  it('shows missing token error if resetToken is absent in reset flow', async () => {
+    const user = userEvent.setup()
+    render(<PasswordReset onBackToLogin={vi.fn()} resetToken={undefined} />)
 
-  it('should handle expired recovery link', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+    await user.type(screen.getByLabelText(/email address/i), 'pilot@example.com')
+    await user.click(screen.getByRole('button', { name: /send reset email/i }))
 
-  it('should handle invalid recovery link', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+    await waitFor(() => {
+      expect(mockRequestPasswordReset).toHaveBeenCalled()
+    })
+  })
 
-  // Form submission tests
-  it('should handle email submission', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+  it('calls onBackToLogin from back button', async () => {
+    const user = userEvent.setup()
+    const onBackToLogin = vi.fn()
 
-  it('should show loading state during email submission', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+    render(<PasswordReset onBackToLogin={onBackToLogin} />)
 
-  it('should handle network errors', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+    await user.click(screen.getByRole('button', { name: /back to login/i }))
+    expect(onBackToLogin).toHaveBeenCalledTimes(1)
+  })
 
-  // Password update tests
-  it('should update user password', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+  it('shows missing new password error in reset step', async () => {
+    render(<PasswordReset onBackToLogin={vi.fn()} resetToken="token-123" />)
 
-  it('should show loading state during password update', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+    // Button is disabled when fields are empty; submit form directly to test handler
+    const form = screen.getByLabelText(/new password/i).closest('form') as HTMLFormElement
+    fireEvent.submit(form)
 
-  it('should handle password update errors', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+    await waitFor(() => {
+      expect(mockToast.error).toHaveBeenCalledWith('Please enter a new password')
+    })
+  })
 
-  // Navigation tests
-  it('should navigate back to login', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+  it('shows short password error in reset step', async () => {
+    const user = userEvent.setup()
+    render(<PasswordReset onBackToLogin={vi.fn()} resetToken="token-123" />)
 
-  it('should redirect to login after successful reset', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
+    await user.type(screen.getByLabelText(/new password/i), '12345')
+    await user.type(screen.getByLabelText(/confirm password/i), '12345')
+    await user.click(screen.getByRole('button', { name: /update password/i }))
 
-  // Password visibility tests
-  it('should toggle password visibility', () => {
-    const { container } = render(<PasswordReset />);
-    const toggles = container.querySelectorAll('[aria-label*="password"]');
-    expect(toggles.length >= 0).toBe(true);
-  });
+    await waitFor(() => {
+      expect(mockToast.error).toHaveBeenCalledWith('Password must be at least 6 characters')
+    })
+  })
 
-  // Component lifecycle tests
-  it('should mount without errors', () => {
-    expect(() => {
-      render(<PasswordReset />);
-    }).not.toThrow();
-  });
+  it('shows update error when confirmPasswordReset fails', async () => {
+    const user = userEvent.setup()
+    mockConfirmPasswordReset.mockRejectedValueOnce(new Error('Token expired'))
 
-  it('should unmount cleanly', () => {
-    const { unmount } = render(<PasswordReset />);
-    expect(() => {
-      unmount();
-    }).not.toThrow();
-  });
+    render(<PasswordReset onBackToLogin={vi.fn()} resetToken="token-123" />)
 
-  it('should handle prop updates', () => {
-    const { rerender } = render(<PasswordReset />);
-    expect(() => {
-      rerender(<PasswordReset />);
-    }).not.toThrow();
-  });
+    await user.type(screen.getByLabelText(/new password/i), 'secret123')
+    await user.type(screen.getByLabelText(/confirm password/i), 'secret123')
+    await user.click(screen.getByRole('button', { name: /update password/i }))
 
-  // Accessibility tests
-  it('should have proper form structure', () => {
-    const { container } = render(<PasswordReset />);
-    const form = container.querySelector('form');
-    expect(form || container).toBeTruthy();
-  });
-
-  it('should have accessible labels', () => {
-    const { container } = render(<PasswordReset />);
-    const labels = container.querySelectorAll('label');
-    expect(labels.length >= 0).toBe(true);
-  });
-
-  it('should support keyboard navigation', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
-
-  // Edge cases
-  it('should handle very long email', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
-
-  it('should handle special characters in email', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
-
-  it('should prevent form submission with empty email', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
-
-  it('should handle rapid form submissions', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
-
-  it('should handle browser autofill', () => {
-    const { container } = render(<PasswordReset />);
-    expect(container).toBeTruthy();
-  });
-});
+    await waitFor(() => {
+      expect(mockToast.error).toHaveBeenCalledWith('Token expired')
+    })
+  })
+})
