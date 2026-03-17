@@ -20,7 +20,7 @@ interface LoginProps {
   onForgotPassword: () => void;
 }
 
-export function Login({ onLogin, onSwitchToRegister, onForgotPassword }: LoginProps) {
+export function Login({ onLogin, onSwitchToRegister, onForgotPassword: _onForgotPassword }: LoginProps) {
   const [isLoading, setIsLoading] = useState(false);
   const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>();
 

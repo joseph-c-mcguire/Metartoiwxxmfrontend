@@ -28,25 +28,16 @@ function validateAuthEnv() {
 type AuthView = 'login' | 'register' | 'verify' | 'converter' | 'admin' | 'callback' | 'reset';
 
 function App() {
-  const [currentView, setCurrentView] = useState<AuthView>('login');
+  const initialLoggedIn = isLoggedIn();
+  const [currentView, setCurrentView] = useState<AuthView>(initialLoggedIn ? 'converter' : 'login');
   const [userEmail, setUserEmail] = useState('');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(initialLoggedIn);
   const [accessToken, setAccessToken] = useState<string>('');
   const [isAdmin, setIsAdmin] = useState(false);
-  const [envValid, setEnvValid] = useState(false);
 
   // Validate environment on mount
   useEffect(() => {
-    if (validateAuthEnv()) {
-      setEnvValid(true);
-      
-      // Check if user is already logged in
-      if (isLoggedIn()) {
-        setIsAuthenticated(true);
-        // Redirect to converter or admin view based on stored data
-        setCurrentView('converter');
-      }
-    }
+    validateAuthEnv();
   }, []);
 
   const handleLogin = (email: string, needsVerification: boolean, token?: string, adminStatus?: boolean) => {

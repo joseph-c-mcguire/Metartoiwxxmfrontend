@@ -38,7 +38,7 @@ async function testSupabaseConnection() {
   // Test 3: Test connection to Supabase
   console.log('\n3️⃣ Testing database connection...');
   try {
-    const { data, error } = await supabase.from('user_profiles').select('count');
+    const { error } = await supabase.from('user_profiles').select('count');
     
     if (error) {
       console.error('❌ Database query failed:', error.message);

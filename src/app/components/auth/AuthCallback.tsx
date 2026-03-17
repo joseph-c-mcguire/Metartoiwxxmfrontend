@@ -22,8 +22,8 @@ export function AuthCallback({ onLogin, onRegister, onVerified }: AuthCallbackPr
         const type = hashParams.get('type');
         
         // Also check for refresh token and expires_at
-        const refreshToken = hashParams.get('refresh_token');
-        const expiresAt = hashParams.get('expires_at');
+        hashParams.get('refresh_token');
+        hashParams.get('expires_at');
 
         if (!accessToken) {
           console.warn('No access token found in callback');

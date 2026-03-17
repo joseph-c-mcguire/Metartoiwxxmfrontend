@@ -11,7 +11,6 @@ import { ThemeToggle } from './ThemeToggle';
 import { DatabaseUploadDialog } from './DatabaseUploadDialog';
 import { UserPreferencesDialog } from './UserPreferencesDialog';
 import { IcaoAutocomplete } from './IcaoAutocomplete';
-import { projectId } from '/utils/supabase/info';
 import { signOutWithScope } from '/utils/supabase/logout';
 import { convertMetarToIwxxm as callBackendConversion } from '/utils/api';
 
@@ -79,55 +78,6 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
       setTimeout(() => {
         onLogout();
       }, 500);
-    }
-  };
-
-  // Check admin access and switch to admin view
-  const handleAdminAccess = async () => {
-    if (!onSwitchToAdmin) return;
-
-    try {
-      // Verify admin status with backend
-      const endpoint = `https://${projectId}.supabase.co/functions/v1/make-server-2e3cda33/admin/stats`;
-      console.log(`🔐 Verifying admin access at: ${endpoint}`);
-      console.log(`📍 Access token type: ${typeof accessToken}`);
-      console.log(`📍 Access token length: ${accessToken?.length}`);
-      console.log(`📍 Access token prefix: ${accessToken?.substring(0, 20)}...`);
-      console.log(`📍 Access token structure: ${accessToken?.includes('.') ? 'JWT format (contains dots)' : 'Unknown format'}`);
-      
-      const response = await fetch(endpoint, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-        },
-      });
-
-      console.log(`📊 Admin verify response status: ${response.status}`);
-      
-      if (response.ok) {
-        console.log('✅ Admin access verified!');
-        // User has admin access
-        onSwitchToAdmin();
-      } else if (response.status === 403) {
-        console.error('❌ User authenticated but not admin (403)');
-        // User is authenticated but not an admin
-        toast.error('Sorry, you don\'t have permissions for that.', {
-          description: 'Admin access is required to view the dashboard.'
-        });
-      } else {
-        const errorText = await response.text();
-        console.error(`❌ Unexpected response status ${response.status}: ${errorText}`);
-        try {
-          const errorJson = JSON.parse(errorText);
-          console.error(`   Parsed error response:`, errorJson);
-        } catch (e) {
-          // Not JSON
-        }
-        // Other error
-        toast.error('Unable to verify admin access');
-      }
-    } catch (error) {
-      console.error('❌ Error checking admin access:', error);
-      toast.error('Failed to verify admin permissions');
     }
   };
 
@@ -271,7 +221,7 @@ export function FileConverter({ onLogout, userEmail, accessToken, onSwitchToAdmi
 
       // Process response and create converted file entries
       if (response.results && Array.isArray(response.results)) {
-        response.results.forEach((result: any, index: number) => {
+        response.results.forEach((result: { iwxxm_xml?: string; xml?: string; content?: string }, index: number) => {
           const originalFile = index < pendingFiles.length 
             ? pendingFiles[index]
             : { name: 'manual_input.txt', content: manualInput };

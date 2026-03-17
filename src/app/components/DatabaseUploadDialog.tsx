@@ -4,7 +4,7 @@ import { Label } from './ui/label';
 import { Card } from './ui/card';
 import { Database, Upload, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { projectId, publicAnonKey } from '/utils/supabase/info';
+import { projectId } from '/utils/supabase/info';
 
 interface DatabaseUploadDialogProps {
   convertedFiles: Array<{

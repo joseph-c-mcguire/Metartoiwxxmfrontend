@@ -95,7 +95,7 @@ describe('Environment Variable Validation', () => {
       // This ensures we're using the correct variable name and not falling back to old naming
       const authServiceUrl = import.meta.env.VITE_AUTH_SERVICE_URL;
       const env = import.meta.env as Record<string, string | undefined>;
-      const oldAuthUrl = env.VITE_AUTH_URL;
+      const _oldAuthUrl = env.VITE_AUTH_URL;
 
       // Should use VITE_AUTH_SERVICE_URL
       expect(authServiceUrl).toBeDefined();

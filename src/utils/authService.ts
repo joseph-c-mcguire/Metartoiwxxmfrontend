@@ -15,7 +15,7 @@ export interface AuthUser {
   metadata: {
     name?: string;
     username?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 

@@ -4,7 +4,6 @@ import { Card } from '../ui/card';
 import { Mail, CheckCircle, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { ThemeToggle } from '../ThemeToggle';
-import { logout } from '@/utils/authService';
 
 interface EmailVerificationProps {
   email: string;

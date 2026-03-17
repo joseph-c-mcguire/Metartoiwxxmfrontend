@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { Input } from './ui/input';
 import { Card } from './ui/card';
-import { Settings, Loader2, CheckCircle, AlertCircle, RotateCcw, User } from 'lucide-react';
+import { Settings, Loader2, CheckCircle, AlertCircle, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { IcaoAutocomplete } from './IcaoAutocomplete';
 
@@ -86,13 +86,7 @@ export function UserPreferencesDialog({ isOpen, onClose, userEmail, onPreference
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
-  useEffect(() => {
-    if (isOpen) {
-      loadPreferences();
-    }
-  }, [isOpen, userEmail]);
-
-  const loadPreferences = () => {
+  const loadPreferences = useCallback(() => {
     setIsLoading(true);
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
@@ -121,7 +115,13 @@ export function UserPreferencesDialog({ isOpen, onClose, userEmail, onPreference
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [userEmail]);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadPreferences();
+    }
+  }, [isOpen, loadPreferences]);
 
   const handleSave = () => {
     if (!preferences) return;

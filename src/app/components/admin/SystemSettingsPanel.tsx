@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { Input } from '../ui/input';
@@ -43,11 +43,7 @@ export function SystemSettingsPanel({ accessToken }: SystemSettingsPanelProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [newIcaoCode, setNewIcaoCode] = useState('');
 
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await fetch(
@@ -72,7 +68,11 @@ export function SystemSettingsPanel({ accessToken }: SystemSettingsPanelProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [accessToken]);
+
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
 
   const handleSave = async () => {
     setIsSaving(true);

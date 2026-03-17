@@ -18,7 +18,7 @@ interface UserApprovalPanelProps {
   accessToken: string;
 }
 
-export function UserApprovalPanel({ accessToken }: UserApprovalPanelProps) {
+export function UserApprovalPanel({ accessToken: _accessToken }: UserApprovalPanelProps) {
   const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [processingUsers, setProcessingUsers] = useState<Set<string>>(new Set());

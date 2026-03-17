@@ -15,6 +15,11 @@ interface IcaoAutocompleteProps {
   id?: string;
 }
 
+interface AirportSuggestion {
+  icao?: string;
+  name?: string;
+}
+
 export function IcaoAutocomplete({
   label,
   value,
@@ -25,7 +30,7 @@ export function IcaoAutocomplete({
   className = '',
   id = 'icao-input',
 }: IcaoAutocompleteProps) {
-  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [suggestions, setSuggestions] = useState<AirportSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isValid, setIsValid] = useState<boolean | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -80,7 +85,7 @@ export function IcaoAutocomplete({
     }
   };
 
-  const handleSuggestionClick = (airport: any) => {
+  const handleSuggestionClick = (airport: AirportSuggestion) => {
     const icaoCode = airport.icao || '';
     onChange(icaoCode);
     setIsValid(true);

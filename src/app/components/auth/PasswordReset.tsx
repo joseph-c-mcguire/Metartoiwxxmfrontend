@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -14,7 +14,7 @@ interface PasswordResetProps {
 }
 
 export function PasswordReset({ onBackToLogin, resetToken }: PasswordResetProps) {
-  const [step, setStep] = useState<'request' | 'reset'>(!resetToken ? 'request' : 'reset');
+  const [step, _setStep] = useState<'request' | 'reset'>(!resetToken ? 'request' : 'reset');
   const [email, setEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');

@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { Input } from '../ui/input';
-import { Loader2, Users, Database, Activity, Search, CheckCircle, XCircle, Clock, Shield } from 'lucide-react';
+import { Loader2, Users, Search, CheckCircle, XCircle, Clock, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import { projectId } from '/utils/supabase/info';
 
@@ -38,11 +38,7 @@ export function MonitoringPanel({ accessToken }: MonitoringPanelProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
 
-  useEffect(() => {
-    loadMonitoringData();
-  }, []);
-
-  const loadMonitoringData = async () => {
+  const loadMonitoringData = useCallback(async () => {
     setIsLoading(true);
     try {
       const [usersResponse, statsResponse] = await Promise.all([
@@ -79,7 +75,11 @@ export function MonitoringPanel({ accessToken }: MonitoringPanelProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [accessToken]);
+
+  useEffect(() => {
+    loadMonitoringData();
+  }, [loadMonitoringData]);
 
   const toggleAdminStatus = async (userId: string, currentStatus: boolean) => {
     try {

@@ -57,7 +57,7 @@ function getAccessToken(): string | null {
 /**
  * Create authorization headers for API requests
  */
-function getAuthHeaders(): HeadersInit {
+function _getAuthHeaders(): HeadersInit {
   const token = getAccessToken();
   return {
     'Authorization': token ? `Bearer ${token}` : '',
