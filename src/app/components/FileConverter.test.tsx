@@ -206,7 +206,7 @@ describe('FileConverter Component', () => {
 
   describe('Drag and Drop', () => {
     it('should handle drag over and track dragging state', async () => {
-      const { container } = render(<FileConverter {...defaultProps} />)
+      render(<FileConverter {...defaultProps} />)
       const dropZone = screen.getByRole('button', { name: /file drop zone/i })
       
       fireEvent.dragOver(dropZone, { dataTransfer: { items: [] } })
@@ -217,7 +217,7 @@ describe('FileConverter Component', () => {
     })
 
     it('should handle drag leave and reset dragging state', async () => {
-      const { container } = render(<FileConverter {...defaultProps} />)
+      render(<FileConverter {...defaultProps} />)
       const dropZone = screen.getByRole('button', { name: /file drop zone/i })
       
       fireEvent.dragLeave(dropZone)
@@ -228,7 +228,7 @@ describe('FileConverter Component', () => {
     })
 
     it('handles file drop with valid files', async () => {
-      const { container } = render(<FileConverter {...defaultProps} />)
+      render(<FileConverter {...defaultProps} />)
       const dropZone = screen.getByRole('button', { name: /file drop zone/i })
       
       const goodFile = {
@@ -585,7 +585,7 @@ describe('FileConverter Component', () => {
 
   describe('Download Behavior', () => {
     it('should not process download when no converted files exist', async () => {
-      const { container } = render(<FileConverter {...defaultProps} />)
+      render(<FileConverter {...defaultProps} />)
       
       // Use aria-label to find the download button uniquely
       const downloadBtn = screen.getByLabelText(/download all.*converted files as zip/i)

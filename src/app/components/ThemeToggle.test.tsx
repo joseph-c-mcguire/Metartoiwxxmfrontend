@@ -43,7 +43,7 @@ describe('ThemeToggle Component', () => {
         themes: [],
         systemTheme: undefined,
         resolvedTheme: undefined,
-      } as any)
+      } as unknown as ReturnType<typeof nextThemes.useTheme>)
       
       const { container } = render(<ThemeToggle />)
       const button = container.querySelector('button')
@@ -61,7 +61,7 @@ describe('ThemeToggle Component', () => {
         themes: [],
         systemTheme: undefined,
         resolvedTheme: undefined,
-      } as any)
+      } as unknown as ReturnType<typeof nextThemes.useTheme>)
       
       const { container } = render(<ThemeToggle />)
       const button = container.querySelector('button')

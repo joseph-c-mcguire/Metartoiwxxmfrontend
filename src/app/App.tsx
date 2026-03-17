@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useLayoutEffect } from 'react';
 import { FileConverter } from "./components/FileConverter";
 import { Login } from "./components/auth/Login";
 import { Register } from "./components/auth/Register";
@@ -38,8 +38,12 @@ function App() {
   // Validate environment on mount
   useEffect(() => {
     validateAuthEnv();
+  }, []);
 
+  // Handle auth callback route
+  useLayoutEffect(() => {
     if (window.location.pathname.includes('/auth/callback')) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCurrentView('callback');
     }
   }, []);
