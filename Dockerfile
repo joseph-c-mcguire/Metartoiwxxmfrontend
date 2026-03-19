@@ -57,7 +57,7 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM nginx:alpine
+FROM nginx:alpine AS production
 
 # Copy built assets from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
@@ -65,6 +65,19 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
+# Runtime substitution: replace placeholder Supabase URL from CI with
+# the real value from the VITE_SUPABASE_URL Render environment variable.
+COPY <<'SCRIPT' /docker-entrypoint-init.sh
+#!/bin/sh
+set -e
+if [ -n "${VITE_SUPABASE_URL}" ]; then
+  find /usr/share/nginx/html -name "*.js" -exec \
+    sed -i "s|https://YOUR_PROJECT_REF\.supabase\.co|${VITE_SUPABASE_URL}|g" {} +
+fi
+exec nginx -g "daemon off;"
+SCRIPT
+RUN chmod +x /docker-entrypoint-init.sh
+
 EXPOSE 80
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["/docker-entrypoint-init.sh"]
