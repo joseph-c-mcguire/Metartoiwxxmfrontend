@@ -39,6 +39,11 @@ export function Login({ onLogin, onSwitchToRegister, onForgotPassword: _onForgot
         return;
       }
 
+      const isAdminUser =
+        response.user.metadata?.role === 'admin' ||
+        response.user.metadata?.username === 'admin' ||
+        response.user.email === 'admin@metar.local';
+
       toast.success(`Welcome back, ${response.user.metadata?.name || response.user.email}!`);
       
       // Call parent handler with user info
@@ -46,7 +51,7 @@ export function Login({ onLogin, onSwitchToRegister, onForgotPassword: _onForgot
         response.user.email,
         false, // needsVerification - auth service handles this
         response.session.access_token,
-        false  // isAdmin - can be added to metadata if needed
+        isAdminUser
       );
       
     } catch (error) {

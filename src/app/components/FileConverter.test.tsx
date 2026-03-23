@@ -581,6 +581,18 @@ describe('FileConverter Component', () => {
       // Should only be labels, not error messages
       expect(errorLabels.length).toBeGreaterThan(0) // UI labels exist
     })
+
+    it('shows toast notification when convert is clicked with no input', async () => {
+      const user = userEvent.setup()
+      render(<FileConverter {...defaultProps} />)
+
+      const convertBtn = screen.getByRole('button', { name: /convert metar files to iwxxm xml/i })
+      expect(convertBtn).toBeDisabled()
+
+      await user.click(convertBtn)
+
+      expect(mockToast.error).not.toHaveBeenCalled()
+    })
   })
 
   describe('Download Behavior', () => {
@@ -623,6 +635,8 @@ describe('FileConverter Component', () => {
 
       expect(screen.getByRole('region', { name: /conversion results/i })).toBeInTheDocument()
       expect(screen.getByText('manual_input.txt')).toBeInTheDocument()
+      expect(mockToast.success).toHaveBeenCalledWith('Successfully converted 1 file(s)')
+      expect(screen.queryByText('Conversion Error')).not.toBeInTheDocument()
     })
 
     it('shows timeout status when backend conversion times out', async () => {
@@ -638,7 +652,9 @@ describe('FileConverter Component', () => {
       await waitFor(() => {
         expect(screen.getByText(/backend may be unreachable/i)).toBeInTheDocument()
       })
-      expect(mockToast.error).toHaveBeenCalledTimes(1)
+      expect(mockToast.error).toHaveBeenCalledWith(
+        'Conversion timeout - Backend may be unreachable. Please check if the API server is running.'
+      )
     })
 
     it('shows auth error when backend returns unauthorized', async () => {
@@ -654,7 +670,9 @@ describe('FileConverter Component', () => {
       await waitFor(() => {
         expect(screen.getByText(/authentication failed/i)).toBeInTheDocument()
       })
-      expect(mockToast.error).toHaveBeenCalledTimes(1)
+      expect(mockToast.error).toHaveBeenCalledWith(
+        'Authentication failed. Please ensure you are logged in.'
+      )
     })
 
     it('uses local logout scope and triggers onLogout after timeout', async () => {
@@ -873,7 +891,8 @@ describe('FileConverter Component', () => {
       await waitFor(() => {
         expect(screen.getByText(/no files were converted/i)).toBeInTheDocument()
       })
-      expect(mockToast.error).toHaveBeenCalled()
+      expect(mockToast.error).toHaveBeenCalledWith('No files were converted')
+      expect(screen.getByText('Conversion Error')).toBeInTheDocument()
     })
 
     it('uses fallback copy path when clipboard API is unavailable', async () => {
@@ -982,6 +1001,7 @@ describe('FileConverter Component', () => {
         expect(screen.getByText('Conversion Error')).toBeInTheDocument()
         expect(screen.getByText('validation parsing failed')).toBeInTheDocument()
       })
+      expect(mockToast.error).toHaveBeenCalledWith('validation parsing failed')
     })
 
     it('keeps logout menu open when scoped logout fails', async () => {
